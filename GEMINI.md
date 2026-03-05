@@ -1,25 +1,25 @@
 # GEMINI.md - Nutrition (AI Diet Diary)
 
 ## Project Status
-- **Current Phase:** AI Integration & API Development
-- **Next Milestone:** Frontend Image Picker & Camera Integration
+- **Current Phase:** Cloud Deployment & CI/CD Setup
+- **Next Milestone:** Live Backend Deployment & Production Testing
 - **Last Updated:** 2026-03-05
 
 ## Tech Stack
-- **Frontend:** React Native (Expo)
-- **Backend:** FastAPI (Python)
-- **AI Model:** Google Gemini 1.5 Flash (API Key Integrated)
-- **Database:** SQLite (Initial)
-- **Storage:** Local (Initial) / AWS S3 (Planned)
+- **Frontend:** React Native / Expo (GitHub Pages for Web)
+- **Backend:** FastAPI (Dockerized for Render/Railway)
+- **AI Model:** Google Gemini 1.5 Flash
+- **CI/CD:** GitHub Actions (Auto-deploy to GitHub Pages)
 
 ## Recent Progress (Last 5 Logs)
-- **2026-03-05:** Implemented `POST /api/v1/analyze` with Gemini 1.5 Flash for multimodal food recognition.
-- **2026-03-05:** Configured secure environment variables (`.env`) and `.gitignore` for API key protection.
-- **2026-03-05:** Scaffolded Expo frontend and FastAPI backend.
-- **2026-03-05:** Project initialization and modular specifications.
+- **2026-03-05:** Configured GitHub Actions for automatic Expo Web deployment to GitHub Pages.
+- **2026-03-05:** Created `Dockerfile` and production requirements for backend deployment.
+- **2026-03-05:** Implemented camera, image picker, and AI analysis integration.
+- **2026-03-05:** Integrated Gemini 1.5 Flash for multimodal food recognition.
+- **2026-03-05:** Scaffolded project with modular specifications.
 
 ## Upcoming Tasks
-- [ ] Implement camera and image picker in Expo frontend.
-- [ ] Connect frontend to `analyze` API endpoint.
-- [ ] Build confirmation screen for AI results in mobile app.
-- [ ] Implement local database for meal logging.
+- [ ] Deploy backend to **Render.com** or **Railway**.
+- [ ] Update `frontend/App.js` with the live production API URL.
+- [ ] Configure GitHub Pages settings to use the `gh-pages` branch.
+- [ ] Implement local SQLite database for meal history.
