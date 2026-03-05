@@ -37,6 +37,9 @@ jobs:
           EXPO_PUBLIC_BASE_URL: /Nutrition
         run: npx expo export --platform web --output-dir dist
 
+      - name: Add .nojekyll
+        run: touch frontend/dist/.nojekyll
+
       - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4
         with:
