@@ -1,4 +1,4 @@
-const { getDefaultConfig } = require('expo/metrobundler-config');
+const { getDefaultConfig } = require('@expo/metro-config');
 
 const config = getDefaultConfig(__dirname);
 
