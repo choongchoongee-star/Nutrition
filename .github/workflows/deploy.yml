@@ -30,7 +30,7 @@ jobs:
 
       - name: Build Web App
         working-directory: ./frontend
-        run: npx expo export --platform web
+        run: npx expo export --platform web --output-dir dist
 
       - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4
