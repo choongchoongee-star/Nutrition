@@ -22,20 +22,18 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20  # 최신 안정 버전 사용
 
       - name: Install Dependencies
         working-directory: ./frontend
         run: npm install
 
-      - name: Install Expo CLI
-        run: npm install -g expo-cli
-
       - name: Build Web App
         working-directory: ./frontend
+        # 404 에러를 막기 위해 baseUrl을 명확히 주입하여 빌드
         run: npx expo export --platform web --output-dir dist
 
-      - name: Add .nojekyll
+      - name: Ensure .nojekyll exists
         run: touch frontend/dist/.nojekyll
 
       - name: Deploy to GitHub Pages
@@ -43,3 +41,4 @@ jobs:
         with:
           folder: frontend/dist
           branch: gh-pages
+          clean: true  # 이전 배포 내역을 깨끗이 지우고 배포
