@@ -32,7 +32,7 @@ jobs:
         working-directory: ./frontend
         env:
           EXPO_PUBLIC_BASE_URL: /Nutrition
-        run: npx expo export --platform web --output-dir dist
+        run: npx expo export -p web
 
       - name: Ensure .nojekyll exists
         run: touch frontend/dist/.nojekyll
