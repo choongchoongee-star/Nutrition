@@ -3,8 +3,8 @@ import { StyleSheet, Text, View, Image, TouchableOpacity, ScrollView, ActivityIn
 import * as ImagePicker from 'expo-image-picker';
 import axios from 'axios';
 
-// Replace with your computer's local IP address (e.g., http://192.168.0.10:8000)
-const API_URL = "http://localhost:8000/api/v1/analyze"; 
+// Production Render Backend URL
+const API_URL = "https://nutrition-4rtp.onrender.com/api/v1/analyze"; 
 
 export default function App() {
   const [image, setImage] = useState(null);
