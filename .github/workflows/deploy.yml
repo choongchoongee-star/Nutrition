@@ -33,6 +33,8 @@ jobs:
 
       - name: Build Web App
         working-directory: ./frontend
+        env:
+          EXPO_PUBLIC_BASE_URL: /Nutrition
         run: npx expo export --platform web --output-dir dist
 
       - name: Deploy to GitHub Pages
