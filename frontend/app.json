@@ -24,8 +24,7 @@
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "bundler": "metro",
-      "baseUrl": "/Nutrition/"
+      "bundler": "metro"
     }
   }
 }
