@@ -10,9 +10,6 @@
     "web": "expo start --web"
   },
   "dependencies": {
-    "@expo/metro-config": "~55.0.9",
-    "@expo/metro-runtime": "~4.0.1",
-    "axios": "^1.8.1",
     "expo": "~52.0.37",
     "expo-camera": "~16.0.17",
     "expo-image-picker": "~16.0.6",
@@ -20,7 +17,10 @@
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-native": "0.76.7",
-    "react-native-web": "~0.19.13"
+    "react-native-web": "~0.19.13",
+    "axios": "^1.8.1",
+    "@expo/metro-config": "~0.19.0",
+    "@expo/metro-runtime": "~4.0.1"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2"
