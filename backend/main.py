@@ -19,14 +19,21 @@ model = genai.GenerativeModel('gemini-1.5-flash')
 
 app = FastAPI(title="Nutrition AI API")
 
-# Add CORS Middleware
+# Add CORS Middleware (Allow all for easier debugging)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://choongchoongee-star.github.io", "http://localhost:19006", "http://localhost:8081"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def log_requests(request, call_next):
+    print(f"Request: {request.method} {request.url}")
+    response = await call_next(request)
+    print(f"Response status: {response.status_code}")
+    return response
 
 # Response Model
 class NutritionInfo(BaseModel):

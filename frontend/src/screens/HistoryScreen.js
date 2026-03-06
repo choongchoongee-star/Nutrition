@@ -1,15 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { StyleSheet, Text, View, FlatList, Image, TouchableOpacity, Alert } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { getMealsByDate, deleteMeal } from '../db/database';
 import { formatDate } from '../utils/metadata';
-import { Trash2, ChevronDown, ChevronUp } from 'lucide-react-native';
+import { Trash2, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 
 export default function HistoryScreen() {
   const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
   const [meals, setMeals] = useState([]);
-  const [isCalendarVisible, setIsCalendarVisible] = useState(true);
 
   const loadMeals = useCallback(async () => {
     const data = await getMealsByDate(selectedDate);
@@ -52,31 +51,20 @@ export default function HistoryScreen() {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity 
-        style={styles.calendarToggle} 
-        onPress={() => setIsCalendarVisible(!isCalendarVisible)}
-      >
-        <Text style={styles.toggleText}>
-          {isCalendarVisible ? "Hide Calendar" : `Show Calendar (${selectedDate})`}
-        </Text>
-        {isCalendarVisible ? <ChevronUp size={20} color="#007bff" /> : <ChevronDown size={20} color="#007bff" />}
-      </TouchableOpacity>
-
-      {isCalendarVisible && (
-        <Calendar
-          onDayPress={(day) => {
-            setSelectedDate(day.dateString);
-            setIsCalendarVisible(false); // Auto-hide on selection
-          }}
-          markedDates={{
-            [selectedDate]: { selected: true, selectedColor: '#007bff' }
-          }}
-          theme={{
-            todayTextColor: '#007bff',
-            arrowColor: '#007bff',
-          }}
-        />
-      )}
+      <Calendar
+        onDayPress={(day) => setSelectedDate(day.dateString)}
+        markedDates={{
+          [selectedDate]: { selected: true, selectedColor: '#007bff' }
+        }}
+        renderArrow={(direction) => 
+          direction === 'left' ? <ChevronLeft color="#007bff" /> : <ChevronRight color="#007bff" />
+        }
+        theme={{
+          todayTextColor: '#007bff',
+          arrowColor: '#007bff',
+          calendarBackground: '#f8f9fa',
+        }}
+      />
       
       <View style={styles.historyHeader}>
         <Text style={styles.historyTitle}>Meals on {selectedDate}</Text>
@@ -101,20 +89,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-  calendarToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    backgroundColor: '#f0f7ff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#d0e5ff',
-  },
-  toggleText: {
-    color: '#007bff',
-    fontWeight: 'bold',
-    marginRight: 8,
-  },
   historyHeader: {
     padding: 15,
     borderBottomWidth: 1,
@@ -122,7 +96,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#fff',
   },
   historyTitle: {
     fontSize: 16,

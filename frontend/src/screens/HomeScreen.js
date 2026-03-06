@@ -131,7 +131,8 @@ export default function HomeScreen({ navigation }) {
       setResult(response.data);
     } catch (error) {
       console.error(error);
-      Alert.alert("Error", "Failed to analyze food. Ensure backend is running and CORS is allowed.");
+      const errMsg = error.response?.data?.detail || error.message || "Unknown error";
+      Alert.alert("Analysis Error", `Reason: ${errMsg}`);
     } finally {
       setLoading(false);
     }
