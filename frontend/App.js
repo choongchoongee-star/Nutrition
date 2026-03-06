@@ -1,13 +1,14 @@
 import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
 import HomeScreen from './src/screens/HomeScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import { initDatabase } from './src/db/database';
+import { Home, Calendar, Settings } from 'lucide-react-native';
 
-const Stack = createNativeStackNavigator();
+const Tab = createBottomTabNavigator();
 
 export default function App() {
   useEffect(() => {
@@ -17,9 +18,16 @@ export default function App() {
   return (
     <NavigationContainer>
       <StatusBar style="auto" />
-      <Stack.Navigator 
+      <Tab.Navigator 
         initialRouteName="Home"
-        screenOptions={{
+        screenOptions={({ route }) => ({
+          tabBarIcon: ({ color, size }) => {
+            if (route.name === 'Home') return <Home size={size} color={color} />;
+            if (route.name === 'History') return <Calendar size={size} color={color} />;
+            if (route.name === 'Settings') return <Settings size={size} color={color} />;
+          },
+          tabBarActiveTintColor: '#007bff',
+          tabBarInactiveTintColor: 'gray',
           headerStyle: {
             backgroundColor: '#007bff',
           },
@@ -27,24 +35,24 @@ export default function App() {
           headerTitleStyle: {
             fontWeight: 'bold',
           },
-        }}
+        })}
       >
-        <Stack.Screen 
+        <Tab.Screen 
           name="Home" 
           component={HomeScreen} 
           options={{ title: 'Nutrition AI' }}
         />
-        <Stack.Screen 
+        <Tab.Screen 
           name="History" 
           component={HistoryScreen} 
           options={{ title: 'Meal History' }}
         />
-        <Stack.Screen 
+        <Tab.Screen 
           name="Settings" 
           component={SettingsScreen} 
           options={{ title: 'Daily Goals' }}
         />
-      </Stack.Navigator>
+      </Tab.Navigator>
     </NavigationContainer>
   );
 }

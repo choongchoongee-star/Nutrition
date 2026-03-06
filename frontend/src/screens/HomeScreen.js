@@ -1,10 +1,10 @@
 import React, { useState, useCallback } from 'react';
-import { StyleSheet, Text, View, Image, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { StyleSheet, Text, View, Image, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import axios from 'axios';
 import { getImageMetadata, suggestMealType, formatDate } from '../utils/metadata';
 import { saveMeal, getMealsByDate, getGoals } from '../db/database';
-import { Calendar as CalendarIcon, Camera, Image as ImageIcon, Save, Settings } from 'lucide-react-native';
+import { Camera, Image as ImageIcon, Save } from 'lucide-react-native';
 import ProgressBar from '../components/ProgressBar';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -80,7 +80,7 @@ export default function HomeScreen({ navigation }) {
 
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ImagePicker.MediaType.All, // Modern API
       allowsEditing: true,
       quality: 1,
     });
@@ -108,11 +108,19 @@ export default function HomeScreen({ navigation }) {
     setResult(null);
 
     const formData = new FormData();
-    formData.append('image', {
-      uri: image,
-      name: 'photo.jpg',
-      type: 'image/jpeg',
-    });
+    
+    if (Platform.OS === 'web') {
+      // For web, we must fetch the blob from the URI
+      const response = await fetch(image);
+      const blob = await response.blob();
+      formData.append('image', blob, 'photo.jpg');
+    } else {
+      formData.append('image', {
+        uri: image,
+        name: 'photo.jpg',
+        type: 'image/jpeg',
+      });
+    }
 
     try {
       const response = await axios.post(API_URL, formData, {
@@ -123,7 +131,7 @@ export default function HomeScreen({ navigation }) {
       setResult(response.data);
     } catch (error) {
       console.error(error);
-      Alert.alert("Error", "Failed to analyze food. Try again.");
+      Alert.alert("Error", "Failed to analyze food. Ensure backend is running and CORS is allowed.");
     } finally {
       setLoading(false);
     }
@@ -169,18 +177,6 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Nutrition AI 🍎</Text>
-        <View style={styles.headerIcons}>
-          <TouchableOpacity onPress={() => navigation.navigate('History')} style={styles.iconMargin}>
-            <CalendarIcon size={24} color="#007bff" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('Settings')}>
-            <Settings size={24} color="#007bff" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
       <View style={styles.progressCard}>
         <Text style={styles.cardTitle}>Today's Progress</Text>
         <ProgressBar 
@@ -282,23 +278,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     backgroundColor: '#fff',
     padding: 20,
-    paddingTop: 40,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  headerIcons: {
-    flexDirection: 'row',
-  },
-  iconMargin: {
-    marginRight: 15,
+    paddingBottom: 40,
   },
   progressCard: {
     backgroundColor: '#f8f9fa',
@@ -459,4 +439,3 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
 });
-
