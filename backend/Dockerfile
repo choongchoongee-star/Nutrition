@@ -16,4 +16,4 @@ COPY . .
 EXPOSE 8000
 
 # Run the application using Gunicorn for production stability
-CMD ["gunicorn", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "main:app", "--bind", "0.0.0.0:8000"]
+CMD gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:$PORT
