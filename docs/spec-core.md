@@ -7,38 +7,35 @@
 ## 2. High-Level Architecture
 - **Mobile Frontend:** React Native (Expo)
 - **Backend API:** Python (FastAPI)
-- **AI Model:** Google Gemini 1.5 Flash (Primary) / Pro (Fallback/High-Precision)
-- **Database:** SQLite (Initial/Local) or PostgreSQL (Production)
-- **Storage:** AWS S3 or Firebase Storage for image hosting
+- **AI Model:** Google Gemini 1.5 Flash (Primary)
+- **Database:** SQLite (Initial/Local) via `expo-sqlite`
+- **Storage:** Local URI for images (Initial); Cloud storage (Planned)
 
-## 3. Data Models (Initial)
+## 3. Data Models (Implemented)
 
-### 3.1. MealLog
+### 3.1. meals (SQLite)
 | Field | Type | Description |
 |-------|------|-------------|
-| id | UUID | Unique identifier |
-| user_id | UUID | Reference to User |
-| image_url | String | Path to stored image |
-| menu_name | String | Identified food name (Korean) |
-| estimated_weight | Float | Estimated weight in grams (g) |
-| calories | Float | Energy in kcal |
-| carbs | Float | Carbohydrates in grams |
-| protein | Float | Protein in grams |
-| fat | Float | Fat in grams |
-| timestamp | DateTime | When the meal was logged |
-| is_confirmed | Boolean | Whether user manually confirmed the AI result |
+| id | INTEGER | Primary Key (Autoincrement) |
+| date | TEXT | YYYY-MM-DD format |
+| meal_type | TEXT | Breakfast, Lunch, Dinner, Snack |
+| menu_name | TEXT | Identified food name (Korean) |
+| kcal | REAL | Energy in kcal |
+| carbs_g | REAL | Carbohydrates in grams |
+| protein_g | REAL | Protein in grams |
+| fat_g | REAL | Fat in grams |
+| image_uri | TEXT | Local path to image |
+| timestamp | DATETIME | Insertion timestamp |
 
-### 3.2. UserProfile
+### 3.2. goals (SQLite)
 | Field | Type | Description |
 |-------|------|-------------|
-| id | UUID | Unique identifier |
-| weight | Float | Current weight |
-| height | Float | Height in cm |
-| activity_level | Enum | Sedentary, Moderate, Active, etc. |
-| target_calories | Float | Daily goal |
-| target_macros | JSON | {carbs, protein, fat} goals |
+| id | INTEGER | Primary Key (Fixed to 1) |
+| target_kcal | REAL | Daily calorie goal |
+| target_carbs | REAL | Daily carbs goal (g) |
+| target_protein | REAL | Daily protein goal (g) |
+| target_fat | REAL | Daily fat goal (g) |
 
 ## 4. Security & Integrity
-- **Credential Safety:** All API Keys (Gemini, AWS) must be handled via environment variables (`.env`).
-- **Input Validation:** Strict validation of image formats and metadata.
-- **Privacy:** Images should be handled securely according to user preference.
+- **Credential Safety:** API Keys handled via environment variables.
+- **Input Validation:** Image metadata (EXIF) extraction for auto-suggesting meal dates.

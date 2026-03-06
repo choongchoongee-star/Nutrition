@@ -5,49 +5,27 @@
 ### 1.1. Nutrition Analysis (`POST /api/v1/analyze`)
 - **Input:** Image file (Multipart)
 - **Workflow:** 
-    1. Upload to storage (S3/Firebase).
-    2. Pass URL/Image to Gemini.
-    3. Return structured JSON.
+    1. Receives image bytes.
+    2. Sends to Gemini 1.5 Flash with system prompt.
+    3. Parses AI response into structured JSON.
 - **Output:**
     ```json
     {
       "menu_name": "Kimchi Jjigae",
-      "estimated_weight": 350,
-      "calories": 450.5,
-      "macros": {
-        "carbs": 25.0,
-        "protein": 15.5,
-        "fat": 30.0
-      }
+      "weight_g": 350.0,
+      "kcal": 450.5,
+      "carbs_g": 25.0,
+      "protein_g": 15.5,
+      "fat_g": 30.0
     }
     ```
 
-### 1.2. Meal Logging (`POST /api/v1/meals`)
-- **Input:** Confirmed nutrition data + Image URL.
-- **Output:** Saved meal record ID.
-
-### 1.3. Daily Statistics (`GET /api/v1/stats/daily`)
-- **Output:** Current intake vs goals.
-
-## 2. Gemini Prompt Engineering (Backend Side)
+## 2. Gemini Prompt Engineering
 ### System Prompt:
-"You are a professional AI Dietitian. Recognize the food in the uploaded photo, estimate the weight (g) based on a typical 1-person serving size, and calculate calories, carbohydrates, protein, and fat. Result MUST be in pure JSON format with Korean menu names."
-
-### Expected JSON Schema:
-```json
-{
-  "menu_name": "string (Korean)",
-  "weight_g": "number",
-  "kcal": "number",
-  "carbs_g": "number",
-  "protein_g": "number",
-  "fat_g": "number"
-}
-```
+"당신은 전문 영양사 AI입니다. 업로드된 사진 속 음식을 인식하고, 일반적인 1인분 크기를 기준으로 무게(g)를 추정한 뒤 칼로리, 탄수화물, 단백질, 지방 함량을 계산하세요. 결과는 반드시 한국어 메뉴명과 함께 순수 JSON 형식으로만 응답하세요. JSON 구조: {'menu_name': str, 'weight_g': float, 'kcal': float, 'carbs_g': float, 'protein_g': float, 'fat_g': float}"
 
 ## 3. Libraries & Dependencies
 - `fastapi`, `uvicorn` (Server)
 - `google-generativeai` (Gemini SDK)
 - `pydantic` (Data Validation)
-- `sqlalchemy` or `tortoise-orm` (Database)
-- `boto3` or `firebase-admin` (Storage)
+- `python-dotenv` (Env management)

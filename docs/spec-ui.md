@@ -2,34 +2,30 @@
 
 ## 1. Screens & UX
 
-### 1.1. Home / Dashboard
-- **Feature:** Visual representation of daily intake (Carbs/Protein/Fat/Calories).
-- **Component:** Circular progress charts or stacked bars vs targets.
-- **Action:** Primary "Add Meal" button (Floating Action Button).
+### 1.1. Home Screen
+- **Feature:** Real-time progress dashboard.
+- **Component:** `ProgressBar` visualization for kcal, carbs, protein, and fat vs daily goals.
+- **Action:** Gallery picker / Camera buttons, "Start AI Analysis" button.
 
-### 1.2. Camera / Upload
-- **Feature:** Integrated camera view and gallery picker.
-- **Workflow:** Capture/Select -> Loading State (Analyzing...) -> Analysis Results.
+### 1.2. History Screen
+- **Feature:** Calendar-based meal logs.
+- **Component:** `react-native-calendars` for date selection, `FlatList` for meal records.
+- **Action:** Tap date to view logs, delete logs with confirmation.
 
-### 1.3. Analysis Confirmation
-- **Feature:** Display AI's estimated menu name, weight, and nutrients.
-- **Action:** Editable fields for correction, "Confirm & Log" button.
+### 1.3. Settings Screen
+- **Feature:** Manage daily nutrient goals.
+- **Action:** Numeric input for kcal, carbs, protein, fat targets.
 
-### 1.4. History / Timeline
-- **Feature:** Scrollable list of past meals with photos and summary.
-- **Action:** Tap to view details or edit.
+### 1.4. Analysis Workflow
+1. **Pick/Take Photo:** Automatic metadata extraction (Date/Time).
+2. **Auto-Suggest:** Sets meal date and type (Breakfast/Lunch/Dinner/Snack) based on photo info.
+3. **AI Analysis:** Calls backend, displays result card.
+4. **Confirm & Log:** Saves to local SQLite database.
 
-### 1.5. Profile / Settings
-- **Feature:** User's weight, height, activity level, and target goals.
-
-## 2. UI/UX Principles
-- **Clarity:** Large, easy-to-read nutrient numbers.
-- **Feedback:** Clear "Analyzing" spinner for long-running AI tasks.
-- **Ease of Use:** Minimize taps from camera capture to log confirmation.
-
-## 3. Tech Stack Components
-- `expo-camera`, `expo-image-picker` (Capture)
-- `react-navigation` (Routing)
-- `react-native-chart-kit` or `victory-native` (Dashboard Visuals)
+## 2. Tech Stack Components
+- `expo-image-picker`, `expo-media-library` (Capture & Metadata)
+- `@react-navigation/native-stack` (Navigation)
+- `expo-sqlite` (Local Storage)
+- `react-native-calendars` (History UI)
 - `lucide-react-native` (Icons)
 - `axios` (API requests)
