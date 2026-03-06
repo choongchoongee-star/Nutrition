@@ -80,7 +80,7 @@ export default function HomeScreen({ navigation }) {
 
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaType.All, // Modern API
+      mediaTypes: ['images'], // Safe for modern Expo and prevents deprecation warning
       allowsEditing: true,
       quality: 1,
     });
