@@ -1,6 +1,7 @@
 import os
 import json
 import traceback
+import logging
 import sys
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,57 +10,51 @@ from pydantic import BaseModel
 import google.generativeai as genai
 from dotenv import load_dotenv
 
-# 즉시 로그 출력 (Render 로그에서 확인용)
-print("--- Starting Nutrition AI Backend ---")
-sys.stdout.flush()
+# 로깅 설정: Render.com 로그 시스템과 호환되도록 stdout으로 출력
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger(__name__)
 
-# Load Environment Variables
+logger.info("--- Starting Nutrition AI Backend (Version 2.0) ---")
+
 load_dotenv()
 
-# Gemini Configuration
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 if not GOOGLE_API_KEY:
-    print("CRITICAL: GOOGLE_API_KEY not found in environment variables.")
-else:
-    print(f"API Key exists: {GOOGLE_API_KEY[:5]}...")
-sys.stdout.flush()
+    logger.error("GOOGLE_API_KEY is missing from environment variables.")
 
 genai.configure(api_key=GOOGLE_API_KEY)
 model = genai.GenerativeModel('gemini-1.5-flash')
 
 app = FastAPI(title="Nutrition AI API")
 
-# 1. 모든 요청 로깅 미들웨어 (가장 최상단)
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    print(f"Incoming Request: {request.method} {request.url}")
-    sys.stdout.flush()
-    try:
-        response = await call_next(request)
-        print(f"Response Status: {response.status_code}")
-        sys.stdout.flush()
-        return response
-    except Exception as e:
-        print(f"Request Failed: {str(e)}")
-        print(traceback.format_exc())
-        sys.stdout.flush()
-        return JSONResponse(
-            status_code=500,
-            content={"detail": "Internal Server Error", "error": str(e)},
-            headers={
-                "Access-Control-Allow-Origin": "https://choongchoongee-star.github.io",
-                "Access-Control-Allow-Credentials": "true",
-            }
-        )
-
-# 2. CORS Middleware
+# 임시로 모든 Origin 허용하여 통신 성공 여부부터 확인
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://choongchoongee-star.github.io", "http://localhost:8081", "http://localhost:19006"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def log_all_requests(request: Request, call_next):
+    logger.info(f"REQUEST: {request.method} {request.url}")
+    try:
+        response = await call_next(request)
+        logger.info(f"RESPONSE: Status {response.status_code}")
+        return response
+    except Exception as e:
+        logger.error(f"INTERNAL ERROR: {str(e)}")
+        logger.error(traceback.format_exc())
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Internal Server Error", "detail": str(e)},
+            headers={"Access-Control-Allow-Origin": "*"}
+        )
 
 class NutritionInfo(BaseModel):
     menu_name: str
@@ -71,18 +66,21 @@ class NutritionInfo(BaseModel):
 
 @app.get("/")
 async def root():
-    return {"status": "ok", "message": "Nutrition AI Backend is Running"}
+    logger.debug("Root endpoint hit")
+    return {"status": "ok", "message": "Backend is online", "key_exists": bool(GOOGLE_API_KEY)}
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
 
 @app.post("/api/v1/analyze", response_model=NutritionInfo)
 async def analyze_food(image: UploadFile = File(...)):
-    print(f"Analyzing food: {image.filename}, type: {image.content_type}")
-    sys.stdout.flush()
+    logger.info(f"Analysis requested: {image.filename}")
     try:
-        if not image.content_type.startswith("image/"):
-            raise HTTPException(status_code=400, detail=f"Invalid file type: {image.content_type}")
-        
         image_bytes = await image.read()
-        
+        if not image_bytes:
+            raise HTTPException(status_code=400, detail="Empty image received")
+
         system_prompt = (
             "당신은 전문 영양사 AI입니다. 업로드된 사진 속 음식을 인식하고, "
             "일반적인 1인분 크기를 기준으로 무게(g)를 추정한 뒤 칼로리, 탄수화물, 단백질, 지방 함량을 계산하세요. "
@@ -102,9 +100,9 @@ async def analyze_food(image: UploadFile = File(...)):
             raw_text = raw_text.split("```")[1].split("```")[0].strip()
 
         data = json.loads(raw_text)
+        logger.info(f"Analysis successful for: {data.get('menu_name')}")
         return NutritionInfo(**data)
 
     except Exception as e:
-        print(f"Error in /analyze: {str(e)}")
-        sys.stdout.flush()
+        logger.error(f"Analysis failed: {str(e)}")
         raise e
