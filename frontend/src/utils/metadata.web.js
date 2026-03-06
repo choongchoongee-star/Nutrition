@@ -1,18 +1,5 @@
-import * as MediaLibrary from 'expo-media-library';
-
 export const getImageMetadata = async (assetId) => {
-  if (!assetId) return null;
-  
-  try {
-    const { status } = await MediaLibrary.requestPermissionsAsync();
-    if (status !== 'granted') return null;
-
-    const assetInfo = await MediaLibrary.getAssetInfoAsync(assetId);
-    return assetInfo;
-  } catch (error) {
-    console.error("Failed to get image metadata:", error);
-    return null;
-  }
+  return null;
 };
 
 export const suggestMealType = (hour) => {
