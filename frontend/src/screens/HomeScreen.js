@@ -55,20 +55,27 @@ export default function HomeScreen({ navigation }) {
     setImage(asset.uri);
     setResult(null);
 
+    // Default to NOW
+    const now = new Date();
+    let finalDate = formatDate(now);
+    let finalType = suggestMealType(now.getHours());
+
     // Metadata extraction
     if (asset.assetId) {
-      const info = await getImageMetadata(asset.assetId);
-      if (info && info.creationTime) {
-        const dateObj = new Date(info.creationTime);
-        setMealDate(formatDate(dateObj));
-        setMealType(suggestMealType(dateObj.getHours()));
+      try {
+        const info = await getImageMetadata(asset.assetId);
+        if (info && info.creationTime) {
+          const dateObj = new Date(info.creationTime);
+          finalDate = formatDate(dateObj);
+          finalType = suggestMealType(dateObj.getHours());
+        }
+      } catch (e) {
+        console.log("Metadata error:", e);
       }
-    } else {
-      // For camera photos, use current time
-      const now = new Date();
-      setMealDate(formatDate(now));
-      setMealType(suggestMealType(now.getHours()));
     }
+    
+    setMealDate(finalDate);
+    setMealType(finalType);
   };
 
   const pickImage = async () => {
