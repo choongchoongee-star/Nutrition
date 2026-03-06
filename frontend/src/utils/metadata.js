@@ -1,6 +1,8 @@
+import { Platform } from 'react-native';
 import * as MediaLibrary from 'expo-media-library';
 
 export const getImageMetadata = async (assetId) => {
+  if (Platform.OS === 'web') return null;
   if (!assetId) return null;
   
   try {
