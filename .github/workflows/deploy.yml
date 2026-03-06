@@ -5,8 +5,17 @@ on:
     branches:
       - main
   workflow_dispatch:
+
+# 배포를 위한 권한 설정
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
+
+# 동시 배포 방지
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
 
 jobs:
   build-and-deploy:
@@ -33,14 +42,21 @@ jobs:
 
       - name: Fix absolute paths in index.html
         working-directory: ./frontend/dist
-        run: sed -i 's|href="/|href="./|g' index.html && sed -i 's|src="/|src="./|g' index.html
+        run: |
+          sed -i 's|href="/|href="./|g' index.html
+          sed -i 's|src="/|src="./|g' index.html
 
       - name: Ensure .nojekyll exists
         run: touch frontend/dist/.nojekyll
 
-      - name: Deploy to GitHub Pages
-        uses: JamesIves/github-pages-deploy-action@v4
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload Artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          folder: frontend/dist
-          branch: gh-pages
-          clean: true  # 이전 배포 내역을 깨끗이 지우고 배포
+          path: 'frontend/dist'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
