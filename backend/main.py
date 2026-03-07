@@ -14,7 +14,8 @@ logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
 load_dotenv()
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+# 두 가지 변수명 모두 지원
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 
 app = FastAPI()
 
@@ -38,14 +39,16 @@ def json_res(data, status=200):
 async def health():
     return json_res({
         "status": "online",
-        "version": "2.7 (Lightweight REST)",
-        "key_set": bool(GOOGLE_API_KEY)
+        "version": "2.8 (Fixed Env Check)",
+        "key_set": bool(GOOGLE_API_KEY),
+        "how_to_fix": "If key_set is false, add 'GOOGLE_API_KEY' in Vercel Project Settings > Environment Variables and REDEPLOY." if not GOOGLE_API_KEY else "All set!"
     })
 
 @app.post("/api/v1/analyze")
 async def analyze(image: UploadFile = File(...)):
     if not GOOGLE_API_KEY:
-        return json_res({"error": "GOOGLE_API_KEY is not set in Vercel environment"}, 500)
+        return json_res({"error": "API Key is missing. Please set GOOGLE_API_KEY in Vercel environment variables."}, 500)
+...
 
     try:
         content = await image.read()
