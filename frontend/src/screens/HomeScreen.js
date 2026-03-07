@@ -23,16 +23,20 @@ export default function HomeScreen({ navigation }) {
   const [goals, setGoals] = useState({ target_kcal: 2000, target_carbs: 250, target_protein: 60, target_fat: 50 });
 
   const loadDailyProgress = useCallback(async () => {
-    const today = formatDate(new Date());
-    const [meals, userGoals] = await Promise.all([getMealsByDate(today), getGoals()]);
-    if (userGoals) setGoals(userGoals);
-    const stats = meals.reduce((acc, m) => ({
-      kcal: acc.kcal + m.kcal,
-      carbs: acc.carbs + m.carbs_g,
-      protein: acc.protein + m.protein_g,
-      fat: acc.fat + m.fat_g,
-    }), { kcal: 0, carbs: 0, protein: 0, fat: 0 });
-    setDailyStats(stats);
+    try {
+      const today = formatDate(new Date());
+      const [meals, userGoals] = await Promise.all([getMealsByDate(today), getGoals()]);
+      if (userGoals) setGoals(userGoals);
+      const stats = meals.reduce((acc, m) => ({
+        kcal: acc.kcal + (Number(m.kcal) || 0),
+        carbs: acc.carbs + (Number(m.carbs_g) || 0),
+        protein: acc.protein + (Number(m.protein_g) || 0),
+        fat: acc.fat + (Number(m.fat_g) || 0),
+      }), { kcal: 0, carbs: 0, protein: 0, fat: 0 });
+      setDailyStats(stats);
+    } catch (e) {
+      console.error("Failed to load progress:", e);
+    }
   }, []);
 
   useFocusEffect(useCallback(() => { loadDailyProgress(); }, [loadDailyProgress]));
@@ -71,7 +75,7 @@ export default function HomeScreen({ navigation }) {
         reader.readAsDataURL(blob);
       });
 
-      const prompt = "Analyze this food image. Return ONLY a valid JSON object with these keys: menu_name (string), weight_g (number), kcal (number), carbs_g (number), protein_g (number), fat_g (number). No markdown, no comments.";
+      const prompt = "Identify this food. Return ONLY valid JSON: {'menu_name':str, 'kcal':float, 'carbs_g':float, 'protein_g':float, 'fat_g':float}";
       
       const apiResponse = await axios.post(`${GEMINI_API_URL}?key=${GOOGLE_API_KEY}`, {
         contents: [{
@@ -84,52 +88,54 @@ export default function HomeScreen({ navigation }) {
       });
 
       const rawText = apiResponse.data.candidates[0].content.parts[0].text;
-      console.log("Raw AI Response:", rawText);
-
-      // Robust JSON extraction
-      try {
-        const start = rawText.indexOf('{');
-        const end = rawText.lastIndexOf('}') + 1;
-        if (start === -1 || end === 0) throw new Error("No JSON found in response");
-        
-        const jsonStr = rawText.substring(start, end);
-        const parsedData = JSON.parse(jsonStr);
-        
-        // Ensure numbers are actually numbers
-        const cleanData = {
-          menu_name: parsedData.menu_name || "Unknown Food",
-          kcal: Number(parsedData.kcal) || 0,
-          carbs_g: Number(parsedData.carbs_g) || 0,
-          protein_g: Number(parsedData.protein_g) || 0,
-          fat_g: Number(parsedData.fat_g) || 0
-        };
-        
-        setResult(cleanData);
-      } catch (parseErr) {
-        setErrorLog(`Parse Error: ${parseErr.message}\nRaw Text: ${rawText}`);
-      }
+      const start = rawText.indexOf('{');
+      const end = rawText.lastIndexOf('}') + 1;
+      const parsedData = JSON.parse(rawText.substring(start, end));
+      
+      setResult({
+        menu_name: parsedData.menu_name || "Unknown",
+        kcal: Number(parsedData.kcal) || 0,
+        carbs_g: Number(parsedData.carbs_g) || 0,
+        protein_g: Number(parsedData.protein_g) || 0,
+        fat_g: Number(parsedData.fat_g) || 0
+      });
     } catch (error) {
-      const detail = error.response?.data ? JSON.stringify(error.response.data, null, 2) : error.message;
-      setErrorLog(`API Error: ${detail}`);
+      setErrorLog(`Analysis Error: ${error.message}`);
     } finally {
       setLoading(false);
     }
   };
 
   const handleSave = async () => {
-    if (!result) return;
+    console.log("Confirm & Log button pressed");
+    if (!result) {
+      console.log("No result to save");
+      return;
+    }
+
     try {
-      await saveMeal({
+      const mealData = {
         date: formatDate(new Date()),
         meal_type: suggestMealType(new Date().getHours()),
         menu_name: result.menu_name,
-        kcal: result.kcal, carbs_g: result.carbs_g, protein_g: result.protein_g, fat_g: result.fat_g,
+        kcal: result.kcal,
+        carbs_g: result.carbs_g,
+        protein_g: result.protein_g,
+        fat_g: result.fat_g,
         image_uri: image
-      });
-      Alert.alert("Success", "Meal logged!");
-      setResult(null); setImage(null);
-      loadDailyProgress();
-    } catch (e) { Alert.alert("Error", "Save failed"); }
+      };
+      
+      console.log("Saving meal data:", mealData);
+      await saveMeal(mealData);
+      
+      Alert.alert("Success", "Meal logged successfully!");
+      setResult(null);
+      setImage(null);
+      loadDailyProgress(); // 대시보드 새로고침
+    } catch (error) {
+      console.error("Save Meal Error:", error);
+      Alert.alert("Save Failed", `Reason: ${error.message}`);
+    }
   };
 
   return (
@@ -161,10 +167,8 @@ export default function HomeScreen({ navigation }) {
 
       {errorLog && (
         <View style={styles.errorContainer}>
-          <Text style={styles.errorTitle}>⚠️ Analysis Issue</Text>
-          <ScrollView style={styles.errorScroll} nestedScrollEnabled={true}>
-            <Text style={styles.errorText}>{errorLog}</Text>
-          </ScrollView>
+          <Text style={styles.errorTitle}>⚠️ Issue Detected</Text>
+          <Text style={styles.errorText}>{errorLog}</Text>
           <TouchableOpacity onPress={() => setErrorLog(null)} style={{marginTop: 10}}><Text style={{color: '#d32f2f', textAlign: 'right'}}>Dismiss</Text></TouchableOpacity>
         </View>
       )}
@@ -178,12 +182,15 @@ export default function HomeScreen({ navigation }) {
             <View style={styles.nutrientItem}><Text style={styles.nutrientVal}>{result.protein_g}g</Text><Text>Protein</Text></View>
             <View style={styles.nutrientItem}><Text style={styles.nutrientVal}>{result.fat_g}g</Text><Text>Fat</Text></View>
           </View>
-          <TouchableOpacity style={styles.saveButton} onPress={handleSave}><Save size={20} color="#fff" /><Text style={styles.saveButtonText}>Confirm & Log</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+            <Save size={20} color="#fff" />
+            <Text style={styles.saveButtonText}>Confirm & Log</Text>
+          </TouchableOpacity>
         </View>
       )}
 
       <View style={{ marginTop: 30, alignItems: 'center', opacity: 0.3 }}>
-        <Text style={{ fontSize: 10 }}>v1.1.8 (Ready for Action)</Text>
+        <Text style={{ fontSize: 10 }}>v1.1.9 (Storage & Logging Fix)</Text>
       </View>
     </ScrollView>
   );
@@ -201,8 +208,7 @@ const styles = StyleSheet.create({
   analyzeButton: { backgroundColor: '#28a745', padding: 15, borderRadius: 12, alignItems: 'center' },
   errorContainer: { backgroundColor: '#fff0f0', padding: 15, borderRadius: 12, marginTop: 10, borderLeftWidth: 5, borderLeftColor: '#ff4d4d' },
   errorTitle: { fontWeight: 'bold', color: '#d32f2f', marginBottom: 5 },
-  errorScroll: { maxHeight: 150 },
-  errorText: { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 12, color: '#333' },
+  errorText: { fontSize: 12, color: '#333' },
   resultCard: { backgroundColor: '#fff', padding: 20, borderRadius: 20, marginTop: 10, borderWidth: 1, borderColor: '#eee' },
   foodName: { fontSize: 22, fontWeight: 'bold', marginBottom: 15 },
   nutrientGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
