@@ -8,14 +8,15 @@ import { Camera, Image as ImageIcon, Save } from 'lucide-react-native';
 import ProgressBar from '../components/ProgressBar';
 import { useFocusEffect } from '@react-navigation/native';
 
-// 가장 범용적인 1.5 Flash 모델로 다시 시도합니다.
-const MODEL_ID = "gemini-1.5-flash"; 
+// 사용자 리스트에 있는 Gemini 2.0 Flash 모델을 정확히 타겟팅합니다.
+const MODEL_ID = "gemini-2.0-flash"; 
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_ID}:generateContent`;
 
 export default function HomeScreen({ navigation }) {
   const [image, setImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [errorLog, setErrorLog] = useState(null); // 에러를 화면에 보여주기 위한 상태
   
   const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_API_KEY || ""; 
 
@@ -24,10 +25,7 @@ export default function HomeScreen({ navigation }) {
 
   const loadDailyProgress = useCallback(async () => {
     const today = formatDate(new Date());
-    const [meals, userGoals] = await Promise.all([
-      getMealsByDate(today),
-      getGoals()
-    ]);
+    const [meals, userGoals] = await Promise.all([getMealsByDate(today), getGoals()]);
     if (userGoals) setGoals(userGoals);
     const stats = meals.reduce((acc, m) => ({
       kcal: acc.kcal + m.kcal,
@@ -44,6 +42,7 @@ export default function HomeScreen({ navigation }) {
     if (pickerResult.canceled) return;
     setImage(pickerResult.assets[0].uri);
     setResult(null);
+    setErrorLog(null); // 새로운 이미지 선택 시 에러 초기화
   };
 
   const pickImage = async () => {
@@ -60,12 +59,14 @@ export default function HomeScreen({ navigation }) {
 
   const analyzeFood = async () => {
     if (!image) return;
-    const apiKey = GOOGLE_API_KEY; 
-    if (!apiKey) return Alert.alert("Error", "API Key Missing");
+    setErrorLog(null);
+    
+    if (!GOOGLE_API_KEY) {
+      setErrorLog("CRITICAL: API Key is missing from build environment.");
+      return;
+    }
 
     setLoading(true);
-    setResult(null);
-
     try {
       const response = await fetch(image);
       const blob = await response.blob();
@@ -75,9 +76,9 @@ export default function HomeScreen({ navigation }) {
         reader.readAsDataURL(blob);
       });
 
-      const prompt = "Analyze this food and return ONLY JSON: {'menu_name':str, 'weight_g':float, 'kcal':float, 'carbs_g':float, 'protein_g':float, 'fat_g':float}";
+      const prompt = "Identify food and return ONLY JSON: {'menu_name':str, 'weight_g':float, 'kcal':float, 'carbs_g':float, 'protein_g':float, 'fat_g':float}";
       
-      const apiResponse = await axios.post(`${GEMINI_API_URL}?key=${apiKey}`, {
+      const apiResponse = await axios.post(`${GEMINI_API_URL}?key=${GOOGLE_API_KEY}`, {
         contents: [{
           parts: [
             { text: prompt },
@@ -92,10 +93,10 @@ export default function HomeScreen({ navigation }) {
       const end = txt.lastIndexOf('}') + 1;
       setResult(JSON.parse(txt.substring(start, end)));
     } catch (error) {
-      console.error("Gemini Error:", error.response?.data);
-      // 에러 전문을 화면에 표시하여 원인 파악 (가장 중요)
-      const errorDetail = JSON.stringify(error.response?.data || error.message, null, 2);
-      Alert.alert("Analysis Failed", `Model: ${MODEL_ID}\n\nError Detail:\n${errorDetail}`);
+      console.error("Gemini Error:", error);
+      // 에러 전문을 문자열로 변환하여 저장
+      const detail = error.response?.data ? JSON.stringify(error.response.data, null, 2) : error.message;
+      setErrorLog(`ERROR [${MODEL_ID}]: ${detail}`);
     } finally {
       setLoading(false);
     }
@@ -108,15 +109,11 @@ export default function HomeScreen({ navigation }) {
         date: formatDate(new Date()),
         meal_type: suggestMealType(new Date().getHours()),
         menu_name: result.menu_name,
-        kcal: result.kcal,
-        carbs_g: result.carbs_g,
-        protein_g: result.protein_g,
-        fat_g: result.fat_g,
+        kcal: result.kcal, carbs_g: result.carbs_g, protein_g: result.protein_g, fat_g: result.fat_g,
         image_uri: image
       });
       Alert.alert("Success", "Meal logged!");
-      setResult(null);
-      setImage(null);
+      setResult(null); setImage(null);
       loadDailyProgress();
     } catch (e) { Alert.alert("Error", "Save failed"); }
   };
@@ -142,11 +139,21 @@ export default function HomeScreen({ navigation }) {
 
       {image && !loading && !result && (
         <TouchableOpacity style={styles.analyzeButton} onPress={analyzeFood}>
-          <Text style={styles.buttonText}>Start Analysis (Standard Model)</Text>
+          <Text style={styles.buttonText}>Start Analysis (Gemini 2.0)</Text>
         </TouchableOpacity>
       )}
 
       {loading && <ActivityIndicator size="large" color="#007bff" style={{ marginTop: 20 }} />}
+
+      {/* 에러 로그 출력 창 (매우 중요) */}
+      {errorLog && (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorTitle}>⚠️ API Error Report</Text>
+          <ScrollView style={styles.errorScroll} nestedScrollEnabled={true}>
+            <Text style={styles.errorText}>{errorLog}</Text>
+          </ScrollView>
+        </View>
+      )}
 
       {result && (
         <View style={styles.resultCard}>
@@ -162,7 +169,7 @@ export default function HomeScreen({ navigation }) {
       )}
 
       <View style={{ marginTop: 30, alignItems: 'center', opacity: 0.3 }}>
-        <Text style={{ fontSize: 10 }}>v1.1.5 (Debug Mode - Full Error Report)</Text>
+        <Text style={{ fontSize: 10 }}>v1.1.6 (Gemini 2.0 - Error Monitoring Mode)</Text>
       </View>
     </ScrollView>
   );
@@ -178,6 +185,10 @@ const styles = StyleSheet.create({
   iconButton: { backgroundColor: '#007bff', padding: 12, borderRadius: 12, flexDirection: 'row', alignItems: 'center', flex: 0.48, justifyContent: 'center' },
   buttonText: { color: '#fff', fontWeight: '600', marginLeft: 8 },
   analyzeButton: { backgroundColor: '#28a745', padding: 15, borderRadius: 12, alignItems: 'center' },
+  errorContainer: { backgroundColor: '#fff0f0', padding: 15, borderRadius: 12, marginTop: 10, borderLeftWidth: 5, borderLeftColor: '#ff4d4d' },
+  errorTitle: { fontWeight: 'bold', color: '#d32f2f', marginBottom: 5 },
+  errorScroll: { maxHeight: 150 },
+  errorText: { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 12, color: '#333' },
   resultCard: { backgroundColor: '#fff', padding: 20, borderRadius: 20, marginTop: 10, borderWidth: 1, borderColor: '#eee' },
   foodName: { fontSize: 22, fontWeight: 'bold', marginBottom: 15 },
   nutrientGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
