@@ -309,7 +309,7 @@ export default function HomeScreen({ navigation }) {
       )}
 
       <View style={{ marginTop: 30, alignItems: 'center', opacity: 0.3 }}>
-        <Text style={{ fontSize: 10 }}>v1.0.7 (REST Backend - 2026-03-07)</Text>
+        <Text style={{ fontSize: 10 }}>v1.0.8 (REST Backend - 2026-03-07)</Text>
       </View>
     </ScrollView>
   );
