@@ -284,6 +284,10 @@ export default function HomeScreen({ navigation }) {
           </TouchableOpacity>
         </View>
       )}
+
+      <View style={{ marginTop: 30, alignItems: 'center', opacity: 0.3 }}>
+        <Text style={{ fontSize: 10 }}>v1.0.1 (Last Updated: 2026-03-07)</Text>
+      </View>
     </ScrollView>
   );
 }
