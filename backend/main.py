@@ -13,29 +13,26 @@ from typing import List, Optional
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
-# 로깅 설정
+# 로깅
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-# 환경 변수
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-# Supabase 초기화
 supabase: Client = None
 if SUPABASE_URL and SUPABASE_KEY:
     try:
         supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-        logger.info("Supabase client initialized")
+        logger.info("Supabase 연결 성공")
     except Exception as e:
-        logger.error(f"Supabase init error: {e}")
+        logger.error(f"Supabase 연결 실패: {e}")
 
 app = FastAPI()
 
-# CORS 설정 (1순위 방어)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -45,40 +42,38 @@ app.add_middleware(
     expose_headers=["*"],
 )
 
-# 모든 응답에 CORS 헤더 강제 주입 및 에러 포획 미들웨어 (2순위 방어)
 @app.middleware("http")
-async def safety_middleware(request: Request, call_next):
+async def force_cors(request: Request, call_next):
     try:
         response = await call_next(request)
         response.headers["Access-Control-Allow-Origin"] = "*"
         return response
     except Exception as e:
-        logger.error(f"CRITICAL ERROR: {str(e)}")
-        logger.error(traceback.format_exc())
+        logger.error(f"서버 에러 발생: {str(e)}")
         return JSONResponse(
             status_code=500,
-            content={"error": "Internal Server Error", "detail": str(e)},
+            content={"error": "서버 내부 오류", "detail": str(e)},
             headers={"Access-Control-Allow-Origin": "*"}
         )
 
-# 데이터 모델
+# 데이터 모델 (422 에러 방지를 위해 모든 필드를 더 유연하게 설정)
 class Meal(BaseModel):
     id: Optional[int] = None
     date: str
     meal_type: str
     menu_name: str
-    weight_g: float
-    kcal: float
-    carbs_g: float
-    protein_g: float
-    fat_g: float
+    kcal: float = 0.0
+    carbs_g: float = 0.0
+    protein_g: float = 0.0
+    fat_g: float = 0.0
+    weight_g: Optional[float] = 0.0
     image_uri: Optional[str] = None
 
 class Goal(BaseModel):
-    target_kcal: float
-    target_carbs: float
-    target_protein: float
-    target_fat: float
+    target_kcal: float = 2000.0
+    target_carbs: float = 250.0
+    target_protein: float = 60.0
+    target_fat: float = 50.0
 
 def json_res(data, status=200):
     return JSONResponse(content=data, status_code=status, headers={"Access-Control-Allow-Origin": "*"})
@@ -90,62 +85,67 @@ def json_res(data, status=200):
 async def health():
     return json_res({
         "status": "online",
-        "version": "3.4 (Safety Mode)",
-        "db_ready": supabase is not None,
-        "env_check": {"URL": bool(SUPABASE_URL), "KEY": bool(SUPABASE_KEY)}
+        "version": "3.5 (Korean Support)",
+        "db_ready": supabase is not None
     })
 
 @app.get("/api/v1/meals")
 async def get_meals(date: str):
-    if not supabase: return json_res({"error": "DB not configured"}, 503)
+    if not supabase: return json_res({"error": "DB 연결 안됨"}, 503)
     try:
         res = supabase.table("meals").select("*").eq("date", date).execute()
         return json_res(res.data)
     except Exception as e:
-        logger.error(f"Fetch meals failed: {e}")
-        return json_res({"error": "Fetch failed", "detail": str(e)}, 500)
+        return json_res({"error": "조회 실패", "detail": str(e)}, 500)
 
 @app.post("/api/v1/meals")
 async def add_meal(meal: Meal):
-    if not supabase: return json_res({"error": "DB not ready"}, 503)
+    if not supabase: return json_res({"error": "DB 연결 안됨"}, 503)
     try:
         data = meal.dict(exclude_none=True)
         res = supabase.table("meals").insert(data).execute()
-        if not res.data: return json_res({"error": "Insert failed, no data returned"}, 500)
         return json_res(res.data[0])
     except Exception as e:
-        return json_res({"error": "Insert failed", "detail": str(e)}, 500)
+        logger.error(f"저장 실패: {str(e)}")
+        return json_res({"error": "저장 실패", "detail": str(e)}, 500)
+
+@app.delete("/api/v1/meals/{meal_id}")
+async def delete_meal(meal_id: int):
+    if not supabase: return json_res({"error": "DB 연결 안됨"}, 503)
+    try:
+        supabase.table("meals").delete().eq("id", meal_id).execute()
+        return json_res({"status": "삭제됨"})
+    except Exception as e:
+        return json_res({"error": "삭제 실패", "detail": str(e)}, 500)
 
 @app.get("/api/v1/goals")
 async def get_goals():
-    if not supabase: return json_res({"error": "DB not ready"}, 503)
+    if not supabase: return json_res({"error": "DB 연결 안됨"}, 503)
     try:
-        # 최신 목표 1개만 가져오기
         res = supabase.table("goals").select("*").order("id", desc=True).limit(1).execute()
         if not res.data:
-            # 데이터가 없으면 기본값 반환
             return json_res({"target_kcal": 2000, "target_carbs": 250, "target_protein": 60, "target_fat": 50})
         return json_res(res.data[0])
     except Exception as e:
-        return json_res({"error": "Goals fetch failed", "detail": str(e)}, 500)
+        return json_res({"error": "목표 조회 실패", "detail": str(e)}, 500)
 
 @app.post("/api/v1/goals")
 async def set_goals(goal: Goal):
-    if not supabase: return json_res({"error": "DB not ready"}, 503)
+    if not supabase: return json_res({"error": "DB 연결 안됨"}, 503)
     try:
         res = supabase.table("goals").insert(goal.dict()).execute()
         return json_res(res.data[0])
     except Exception as e:
-        return json_res({"error": "Goals save failed", "detail": str(e)}, 500)
+        return json_res({"error": "목표 저장 실패", "detail": str(e)}, 500)
 
 @app.post("/api/v1/analyze")
 async def analyze(image: UploadFile = File(...)):
-    if not GOOGLE_API_KEY: return json_res({"error": "No API Key"}, 500)
+    if not GOOGLE_API_KEY: return json_res({"error": "API 키 없음"}, 500)
     try:
         content = await image.read()
         base64_img = base64.b64encode(content).decode('utf-8')
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GOOGLE_API_KEY}"
-        prompt = "Identify food and return ONLY JSON: {'menu_name':str,'weight_g':float,'kcal':float,'carbs_g':float,'protein_g':float,'fat_g':float}"
+        prompt = "음식을 분석하고 JSON으로만 응답: {'menu_name':str, 'weight_g':float, 'kcal':float, 'carbs_g':float, 'protein_g':float, 'fat_g':float}"
         payload = {"contents": [{"parts": [{"text": prompt}, {"inline_data": {"mime_type": "image/jpeg", "data": base64_img}}]}], "generationConfig": {"temperature": 0.1}}
         resp = requests.post(url, json=payload, timeout=20)
         txt = resp.json()['candidates'][0]['content']['parts'][0]['text'].strip()

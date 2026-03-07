@@ -35,7 +35,7 @@ export default function HomeScreen({ navigation }) {
       }), { kcal: 0, carbs: 0, protein: 0, fat: 0 });
       setDailyStats(stats);
     } catch (e) {
-      console.error("Failed to load progress:", e);
+      console.error("데이터 로드 실패:", e);
     }
   }, []);
 
@@ -55,7 +55,7 @@ export default function HomeScreen({ navigation }) {
 
   const takePhoto = async () => {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) return Alert.alert("Error", "Camera access denied");
+    if (!permission.granted) return Alert.alert("알림", "카메라 접근 권한이 필요합니다.");
     let result = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.5 });
     await handleImageSource(result);
   };
@@ -63,7 +63,7 @@ export default function HomeScreen({ navigation }) {
   const analyzeFood = async () => {
     if (!image) return;
     setErrorLog(null);
-    if (!GOOGLE_API_KEY) return setErrorLog("Missing API Key");
+    if (!GOOGLE_API_KEY) return setErrorLog("API 키가 설정되지 않았습니다.");
 
     setLoading(true);
     try {
@@ -75,7 +75,7 @@ export default function HomeScreen({ navigation }) {
         reader.readAsDataURL(blob);
       });
 
-      const prompt = "Identify this food. Return ONLY valid JSON: {'menu_name':str, 'kcal':float, 'carbs_g':float, 'protein_g':float, 'fat_g':float}";
+      const prompt = "Analyze food image and return ONLY JSON: {'menu_name':str, 'weight_g':float, 'kcal':float, 'carbs_g':float, 'protein_g':float, 'fat_g':float}";
       
       const apiResponse = await axios.post(`${GEMINI_API_URL}?key=${GOOGLE_API_KEY}`, {
         contents: [{
@@ -93,46 +93,33 @@ export default function HomeScreen({ navigation }) {
       const parsedData = JSON.parse(rawText.substring(start, end));
       
       setResult({
-        menu_name: parsedData.menu_name || "Unknown",
+        menu_name: parsedData.menu_name || "알 수 없는 음식",
         kcal: Number(parsedData.kcal) || 0,
         carbs_g: Number(parsedData.carbs_g) || 0,
         protein_g: Number(parsedData.protein_g) || 0,
-        fat_g: Number(parsedData.fat_g) || 0
+        fat_g: Number(parsedData.fat_g) || 0,
+        weight_g: Number(parsedData.weight_g) || 0
       });
     } catch (error) {
-      setErrorLog(`Analysis Error: ${error.message}`);
+      setErrorLog(`분석 중 오류: ${error.message}`);
     } finally {
       setLoading(false);
     }
   };
 
-  // 썸네일 생성 함수 (로컬 스토리지 용량 절약)
   const compressImageForStorage = (uri) => {
     return new Promise((resolve) => {
-      if (Platform.OS !== 'web') {
-        resolve(uri); // 네이티브 앱은 파일 시스템을 쓰므로 그대로 반환
-        return;
-      }
-      
+      if (Platform.OS !== 'web') return resolve(uri);
       const img = new window.Image();
-      img.crossOrigin = "Anonymous";
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const MAX_SIZE = 150; // 150px 초소형 썸네일
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height) {
-          if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
-        } else {
-          if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
+        const MAX_SIZE = 150;
+        let width = img.width, height = img.height;
+        if (width > height) { if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; } }
+        else { if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; } }
+        canvas.width = width; canvas.height = height;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, width, height);
-        // 품질을 30%로 극한 압축
         resolve(canvas.toDataURL('image/jpeg', 0.3));
       };
       img.onerror = () => resolve(null);
@@ -143,11 +130,8 @@ export default function HomeScreen({ navigation }) {
   const handleSave = async () => {
     if (!result) return;
     setLoading(true);
-
     try {
-      // 용량 문제 해결을 위해 이미지 썸네일화 진행
       const thumbnailUri = await compressImageForStorage(image);
-
       const mealData = {
         date: formatDate(new Date()),
         meal_type: suggestMealType(new Date().getHours()),
@@ -156,18 +140,16 @@ export default function HomeScreen({ navigation }) {
         carbs_g: result.carbs_g,
         protein_g: result.protein_g,
         fat_g: result.fat_g,
-        image_uri: thumbnailUri // 압축된 이미지 저장
+        weight_g: result.weight_g,
+        image_uri: thumbnailUri
       };
       
       await saveMeal(mealData);
-      
-      Alert.alert("Success", "Meal logged successfully!");
-      setResult(null);
-      setImage(null);
+      Alert.alert("성공", "식단이 기록되었습니다!");
+      setResult(null); setImage(null);
       loadDailyProgress();
     } catch (error) {
-      console.error("Save Meal Error:", error);
-      Alert.alert("Save Failed", `Reason: ${error.message}`);
+      Alert.alert("실패", `이유: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -176,25 +158,25 @@ export default function HomeScreen({ navigation }) {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.progressCard}>
-        <Text style={styles.cardTitle}>Today's Progress</Text>
-        <ProgressBar label="Calories" current={dailyStats.kcal} target={goals.target_kcal} color="#FF6B6B" />
-        <ProgressBar label="Carbs" current={dailyStats.carbs} target={goals.target_carbs} color="#4D96FF" />
-        <ProgressBar label="Protein" current={dailyStats.protein} target={goals.target_protein} color="#6BCB77" />
-        <ProgressBar label="Fat" current={dailyStats.fat} target={goals.target_fat} color="#FFD93D" />
+        <Text style={styles.cardTitle}>오늘의 영양 상태</Text>
+        <ProgressBar label="칼로리" current={dailyStats.kcal} target={goals.target_kcal} color="#FF6B6B" unit="kcal" />
+        <ProgressBar label="탄수화물" current={dailyStats.carbs} target={goals.target_carbs} color="#4D96FF" unit="g" />
+        <ProgressBar label="단백질" current={dailyStats.protein} target={goals.target_protein} color="#6BCB77" unit="g" />
+        <ProgressBar label="지방" current={dailyStats.fat} target={goals.target_fat} color="#FFD93D" unit="g" />
       </View>
       
       {image ? <Image source={{ uri: image }} style={styles.image} /> : (
-        <View style={styles.placeholder}><Text style={{color: '#888'}}>Select food photo</Text></View>
+        <View style={styles.placeholder}><Text style={{color: '#888'}}>음식 사진을 선택해주세요</Text></View>
       )}
 
       <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.iconButton} onPress={pickImage}><ImageIcon size={20} color="#fff" /><Text style={styles.buttonText}>Gallery</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.iconButton} onPress={takePhoto}><Camera size={20} color="#fff" /><Text style={styles.buttonText}>Camera</Text></TouchableOpacity>
+        <TouchableOpacity style={styles.iconButton} onPress={pickImage}><ImageIcon size={20} color="#fff" /><Text style={styles.buttonText}>갤러리</Text></TouchableOpacity>
+        <TouchableOpacity style={styles.iconButton} onPress={takePhoto}><Camera size={20} color="#fff" /><Text style={styles.buttonText}>카메라</Text></TouchableOpacity>
       </View>
 
       {image && !loading && !result && (
         <TouchableOpacity style={styles.analyzeButton} onPress={analyzeFood}>
-          <Text style={styles.buttonText}>Analyze Food</Text>
+          <Text style={styles.buttonText}>AI 분석 시작</Text>
         </TouchableOpacity>
       )}
 
@@ -202,9 +184,9 @@ export default function HomeScreen({ navigation }) {
 
       {errorLog && (
         <View style={styles.errorContainer}>
-          <Text style={styles.errorTitle}>⚠️ Issue Detected</Text>
+          <Text style={styles.errorTitle}>⚠️ 알림</Text>
           <Text style={styles.errorText}>{errorLog}</Text>
-          <TouchableOpacity onPress={() => setErrorLog(null)} style={{marginTop: 10}}><Text style={{color: '#d32f2f', textAlign: 'right'}}>Dismiss</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => setErrorLog(null)} style={{marginTop: 10}}><Text style={{color: '#d32f2f', textAlign: 'right'}}>닫기</Text></TouchableOpacity>
         </View>
       )}
 
@@ -213,19 +195,19 @@ export default function HomeScreen({ navigation }) {
           <Text style={styles.foodName}>{result.menu_name}</Text>
           <View style={styles.nutrientGrid}>
             <View style={styles.nutrientItem}><Text style={styles.nutrientVal}>{result.kcal}</Text><Text>kcal</Text></View>
-            <View style={styles.nutrientItem}><Text style={styles.nutrientVal}>{result.carbs_g}g</Text><Text>Carbs</Text></View>
-            <View style={styles.nutrientItem}><Text style={styles.nutrientVal}>{result.protein_g}g</Text><Text>Protein</Text></View>
-            <View style={styles.nutrientItem}><Text style={styles.nutrientVal}>{result.fat_g}g</Text><Text>Fat</Text></View>
+            <View style={styles.nutrientItem}><Text style={styles.nutrientVal}>{result.carbs_g}g</Text><Text>탄수화물</Text></View>
+            <View style={styles.nutrientItem}><Text style={styles.nutrientVal}>{result.protein_g}g</Text><Text>단백질</Text></View>
+            <View style={styles.nutrientItem}><Text style={styles.nutrientVal}>{result.fat_g}g</Text><Text>지방</Text></View>
           </View>
           <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
             <Save size={20} color="#fff" />
-            <Text style={styles.saveButtonText}>Confirm & Log</Text>
+            <Text style={styles.saveButtonText}>식단 기록하기</Text>
           </TouchableOpacity>
         </View>
       )}
 
       <View style={{ marginTop: 30, alignItems: 'center', opacity: 0.3 }}>
-        <Text style={{ fontSize: 10 }}>v1.2.1 (Thumbnail Save Mode)</Text>
+        <Text style={{ fontSize: 10 }}>v1.3.0 (한글 지원 및 클라우드 동기화)</Text>
       </View>
     </ScrollView>
   );
