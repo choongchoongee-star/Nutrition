@@ -14,8 +14,8 @@
 ## Recent Progress (Last 5 Logs)
 - **2026-03-07:** Conducted security audit. No hardcoded keys found. Improved `frontend/.gitignore` to strictly exclude all `.env` variants.
 - **2026-03-07:** Fixed critical syntax error in `main.py` (v2.9) that caused Vercel function crash. Restored full REST API logic.
-- **2026-03-07:** Switched to `gemini-2.0-flash` and implemented On-Screen Error Monitoring (v1.1.6). This will display raw API responses directly on the UI for easier debugging.
-- **2026-03-07:** Reverted to `gemini-1.5-flash` and implemented Full Error Reporting (v1.1.5) to identify the root cause of persistent 404 errors.
+- **2026-03-07:** Successfully received AI responses and implemented Robust JSON Extraction (v1.1.8) to handle conversational or markdown-formatted API replies.
+- **2026-03-07:** Switched to `gemini-2.5-flash` and implemented On-Screen Error Monitoring (v1.1.6). This will display raw API responses directly on the UI for easier debugging.
 - **2026-03-07:** Switched to stable `v1` Gemini API endpoint (v1.1.2) to resolve 404 errors. Improved error reporting to show server-side reason.
 - **2026-03-07:** Fixed UI button unresponsiveness by correcting undefined styles. Updated GitHub Actions (`deploy.yml`) to properly inject `EXPO_PUBLIC_GOOGLE_API_KEY` during build.
 - **2026-03-07:** Migrated backend to direct REST API calls (v2.7) to fix 500 errors caused by heavy library initialization in Vercel. Added detailed error reporting in v1.0.6.

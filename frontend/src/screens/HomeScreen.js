@@ -8,7 +8,6 @@ import { Camera, Image as ImageIcon, Save } from 'lucide-react-native';
 import ProgressBar from '../components/ProgressBar';
 import { useFocusEffect } from '@react-navigation/native';
 
-// 2026년 3월 기준, 리스트에 있는 최신 상용 모델인 2.5 Flash를 사용합니다.
 const MODEL_ID = "gemini-2.5-flash"; 
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_ID}:generateContent`;
 
@@ -60,11 +59,7 @@ export default function HomeScreen({ navigation }) {
   const analyzeFood = async () => {
     if (!image) return;
     setErrorLog(null);
-    
-    if (!GOOGLE_API_KEY) {
-      setErrorLog("CRITICAL: API Key is missing from build environment.");
-      return;
-    }
+    if (!GOOGLE_API_KEY) return setErrorLog("Missing API Key");
 
     setLoading(true);
     try {
@@ -76,7 +71,7 @@ export default function HomeScreen({ navigation }) {
         reader.readAsDataURL(blob);
       });
 
-      const prompt = "Identify food and return ONLY JSON: {'menu_name':str, 'weight_g':float, 'kcal':float, 'carbs_g':float, 'protein_g':float, 'fat_g':float}";
+      const prompt = "Analyze this food image. Return ONLY a valid JSON object with these keys: menu_name (string), weight_g (number), kcal (number), carbs_g (number), protein_g (number), fat_g (number). No markdown, no comments.";
       
       const apiResponse = await axios.post(`${GEMINI_API_URL}?key=${GOOGLE_API_KEY}`, {
         contents: [{
@@ -88,14 +83,34 @@ export default function HomeScreen({ navigation }) {
         generationConfig: { temperature: 0.1 }
       });
 
-      const txt = apiResponse.data.candidates[0].content.parts[0].text;
-      const start = txt.indexOf('{');
-      const end = txt.lastIndexOf('}') + 1;
-      setResult(JSON.parse(txt.substring(start, end)));
+      const rawText = apiResponse.data.candidates[0].content.parts[0].text;
+      console.log("Raw AI Response:", rawText);
+
+      // Robust JSON extraction
+      try {
+        const start = rawText.indexOf('{');
+        const end = rawText.lastIndexOf('}') + 1;
+        if (start === -1 || end === 0) throw new Error("No JSON found in response");
+        
+        const jsonStr = rawText.substring(start, end);
+        const parsedData = JSON.parse(jsonStr);
+        
+        // Ensure numbers are actually numbers
+        const cleanData = {
+          menu_name: parsedData.menu_name || "Unknown Food",
+          kcal: Number(parsedData.kcal) || 0,
+          carbs_g: Number(parsedData.carbs_g) || 0,
+          protein_g: Number(parsedData.protein_g) || 0,
+          fat_g: Number(parsedData.fat_g) || 0
+        };
+        
+        setResult(cleanData);
+      } catch (parseErr) {
+        setErrorLog(`Parse Error: ${parseErr.message}\nRaw Text: ${rawText}`);
+      }
     } catch (error) {
-      console.error("Gemini Error:", error);
       const detail = error.response?.data ? JSON.stringify(error.response.data, null, 2) : error.message;
-      setErrorLog(`ERROR [${MODEL_ID}]: ${detail}`);
+      setErrorLog(`API Error: ${detail}`);
     } finally {
       setLoading(false);
     }
@@ -138,7 +153,7 @@ export default function HomeScreen({ navigation }) {
 
       {image && !loading && !result && (
         <TouchableOpacity style={styles.analyzeButton} onPress={analyzeFood}>
-          <Text style={styles.buttonText}>Start Analysis (Gemini 2.5)</Text>
+          <Text style={styles.buttonText}>Analyze Food</Text>
         </TouchableOpacity>
       )}
 
@@ -146,10 +161,11 @@ export default function HomeScreen({ navigation }) {
 
       {errorLog && (
         <View style={styles.errorContainer}>
-          <Text style={styles.errorTitle}>⚠️ API Error Report</Text>
+          <Text style={styles.errorTitle}>⚠️ Analysis Issue</Text>
           <ScrollView style={styles.errorScroll} nestedScrollEnabled={true}>
             <Text style={styles.errorText}>{errorLog}</Text>
           </ScrollView>
+          <TouchableOpacity onPress={() => setErrorLog(null)} style={{marginTop: 10}}><Text style={{color: '#d32f2f', textAlign: 'right'}}>Dismiss</Text></TouchableOpacity>
         </View>
       )}
 
@@ -167,7 +183,7 @@ export default function HomeScreen({ navigation }) {
       )}
 
       <View style={{ marginTop: 30, alignItems: 'center', opacity: 0.3 }}>
-        <Text style={{ fontSize: 10 }}>v1.1.7 (Latest Model: Gemini 2.5 Flash)</Text>
+        <Text style={{ fontSize: 10 }}>v1.1.8 (Ready for Action)</Text>
       </View>
     </ScrollView>
   );
