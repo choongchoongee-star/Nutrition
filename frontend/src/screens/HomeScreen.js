@@ -8,12 +8,14 @@ import { Camera, Image as ImageIcon, Save } from 'lucide-react-native';
 import ProgressBar from '../components/ProgressBar';
 import { useFocusEffect } from '@react-navigation/native';
 
-const API_URL = "https://nutrition-4rtp.onrender.com/api/v1/analyze"; 
+const API_URL = "https://nutrition-4rtp.onrender.com/api/v1/analyze";
+const HEALTH_URL = "https://nutrition-4rtp.onrender.com/health";
 
 export default function HomeScreen({ navigation }) {
   const [image, setImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [serverAwake, setServerAwake] = useState(false);
   
   // Suggested metadata
   const [mealDate, setMealDate] = useState(formatDate(new Date()));
@@ -22,6 +24,18 @@ export default function HomeScreen({ navigation }) {
   // Progress tracking state
   const [dailyStats, setDailyStats] = useState({ kcal: 0, carbs: 0, protein: 0, fat: 0 });
   const [goals, setGoals] = useState({ target_kcal: 2000, target_carbs: 250, target_protein: 60, target_fat: 50 });
+
+  // Wake up the server on mount or focus
+  const wakeUpServer = useCallback(async () => {
+    try {
+      await axios.get(HEALTH_URL, { timeout: 10000 });
+      setServerAwake(true);
+      console.log("Backend is awake!");
+    } catch (e) {
+      console.log("Server wake-up ping failed or still sleeping...");
+      setServerAwake(false);
+    }
+  }, []);
 
   const loadDailyProgress = useCallback(async () => {
     const today = formatDate(new Date());
@@ -45,7 +59,8 @@ export default function HomeScreen({ navigation }) {
   useFocusEffect(
     useCallback(() => {
       loadDailyProgress();
-    }, [loadDailyProgress])
+      wakeUpServer();
+    }, [loadDailyProgress, wakeUpServer])
   );
 
   const handleImageSource = async (pickerResult) => {
@@ -54,6 +69,9 @@ export default function HomeScreen({ navigation }) {
     const asset = pickerResult.assets[0];
     setImage(asset.uri);
     setResult(null);
+    
+    // Proactively ping server when image is picked
+    wakeUpServer();
 
     // Default to NOW
     const now = new Date();
@@ -80,9 +98,10 @@ export default function HomeScreen({ navigation }) {
 
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'], // Safe for modern Expo and prevents deprecation warning
+      mediaTypes: ['images'],
       allowsEditing: true,
-      quality: 0.7, // Reduced quality to prevent huge payloads
+      aspect: [1, 1], // Square aspect often results in smaller file size
+      quality: 0.6, // Further reduced for faster upload
     });
     await handleImageSource(result);
   };
@@ -96,7 +115,8 @@ export default function HomeScreen({ navigation }) {
 
     let result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
-      quality: 0.7, // Reduced quality to prevent huge payloads
+      aspect: [1, 1],
+      quality: 0.6,
     });
     await handleImageSource(result);
   };
@@ -110,7 +130,6 @@ export default function HomeScreen({ navigation }) {
     const formData = new FormData();
     
     if (Platform.OS === 'web') {
-      // For web, we must fetch the blob from the URI
       const response = await fetch(image);
       const blob = await response.blob();
       formData.append('image', blob, 'photo.jpg');
@@ -123,25 +142,24 @@ export default function HomeScreen({ navigation }) {
     }
 
     try {
+      // Increased timeout to 90s to handle both Cold Start + Heavy Analysis
       const response = await axios.post(API_URL, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
-        timeout: 60000, // 60 seconds timeout
+        timeout: 90000, 
       });
       setResult(response.data);
     } catch (error) {
-      console.error("Analysis Error:", error);
+      console.error("Analysis Error Details:", error);
       let errMsg = "Unknown error";
       
       if (error.code === 'ECONNABORTED') {
-        errMsg = "Analysis took too long. Please try again with a smaller image or better connection.";
+        errMsg = "The server is taking too long (over 90s). Render.com's free tier might be waking up or struggling with the image. Please try again in a few seconds.";
       } else if (error.response) {
-        // Server responded with non-2xx code
         errMsg = error.response.data?.detail || error.response.data?.error || `Server Error (${error.response.status})`;
       } else if (error.request) {
-        // Request made but no response received (CORS or Network issue)
-        errMsg = "No response from server. This might be a temporary network issue or CORS restriction.";
+        errMsg = "Cannot reach the server. Please check your internet or wait for the backend to wake up.";
       } else {
         errMsg = error.message;
       }
