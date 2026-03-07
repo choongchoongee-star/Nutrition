@@ -28,7 +28,7 @@ export default function HomeScreen({ navigation }) {
   // Wake up the server on mount or focus
   const wakeUpServer = useCallback(async () => {
     try {
-      await axios.get(HEALTH_URL, { timeout: 10000 });
+      await axios.get(HEALTH_URL, { timeout: 5000 });
       setServerAwake(true);
       console.log("Backend is awake!");
     } catch (e) {
@@ -70,15 +70,12 @@ export default function HomeScreen({ navigation }) {
     setImage(asset.uri);
     setResult(null);
     
-    // Proactively ping server when image is picked
     wakeUpServer();
 
-    // Default to NOW
     const now = new Date();
     let finalDate = formatDate(now);
     let finalType = suggestMealType(now.getHours());
 
-    // Metadata extraction
     if (asset.assetId) {
       try {
         const info = await getImageMetadata(asset.assetId);
@@ -101,7 +98,7 @@ export default function HomeScreen({ navigation }) {
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.6,
+      quality: 0.4, // Optimization: lower quality for 10s Vercel limit
     });
     await handleImageSource(result);
   };
@@ -116,7 +113,7 @@ export default function HomeScreen({ navigation }) {
     let result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.6,
+      quality: 0.4,
     });
     await handleImageSource(result);
   };
@@ -146,7 +143,7 @@ export default function HomeScreen({ navigation }) {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
-        timeout: 90000, 
+        timeout: 30000, 
       });
       setResult(response.data);
     } catch (error) {
@@ -154,11 +151,9 @@ export default function HomeScreen({ navigation }) {
       let errMsg = "Unknown error";
       
       if (error.code === 'ECONNABORTED') {
-        errMsg = "The analysis is taking longer than expected. Please try again in a few seconds.";
+        errMsg = "The analysis is taking longer than expected. Please try again with a smaller image.";
       } else if (error.response) {
-        // Server responded with non-2xx code
         const data = error.response.data;
-        // 서버에서 전달한 구체적인 에러 메시지가 있으면 우선적으로 표시
         errMsg = data?.error || data?.detail || `Server Error (${error.response.status})`;
         if (data?.detail && typeof data.detail === 'object') {
             errMsg += "\n" + JSON.stringify(data.detail);
@@ -309,7 +304,7 @@ export default function HomeScreen({ navigation }) {
       )}
 
       <View style={{ marginTop: 30, alignItems: 'center', opacity: 0.3 }}>
-        <Text style={{ fontSize: 10 }}>v1.0.8 (REST Backend - 2026-03-07)</Text>
+        <Text style={{ fontSize: 10 }}>v1.0.9 (Performance Mode - 2026-03-07)</Text>
       </View>
     </ScrollView>
   );
