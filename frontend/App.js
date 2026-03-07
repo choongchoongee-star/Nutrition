@@ -40,17 +40,17 @@ export default function App() {
         <Tab.Screen 
           name="Home" 
           component={HomeScreen} 
-          options={{ title: 'Nutrition AI' }}
+          options={{ title: '홈' }}
         />
         <Tab.Screen 
           name="History" 
           component={HistoryScreen} 
-          options={{ title: 'Meal History' }}
+          options={{ title: '기록' }}
         />
         <Tab.Screen 
           name="Settings" 
           component={SettingsScreen} 
-          options={{ title: 'Daily Goals' }}
+          options={{ title: '설정' }}
         />
       </Tab.Navigator>
     </NavigationContainer>

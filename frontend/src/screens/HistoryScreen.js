@@ -23,11 +23,11 @@ export default function HistoryScreen() {
 
   const handleDelete = (id) => {
     Alert.alert(
-      "Delete Meal",
-      "Are you sure you want to delete this meal log?",
+      "식단 삭제",
+      "이 식단 기록을 삭제하시겠습니까?",
       [
-        { text: "Cancel", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: async () => {
+        { text: "취소", style: "cancel" },
+        { text: "삭제", style: "destructive", onPress: async () => {
           await deleteMeal(id);
           loadMeals();
         }}
@@ -35,13 +35,23 @@ export default function HistoryScreen() {
     );
   };
 
+  const translateMealType = (type) => {
+    const types = {
+      'Breakfast': '아침',
+      'Lunch': '점심',
+      'Dinner': '저녁',
+      'Snack': '간식'
+    };
+    return types[type] || type;
+  };
+
   const renderMealItem = ({ item }) => (
     <View style={styles.mealItem}>
       {item.image_uri && <Image source={{ uri: item.image_uri }} style={styles.mealImage} />}
       <View style={styles.mealInfo}>
-        <Text style={styles.mealType}>{item.meal_type}</Text>
+        <Text style={styles.mealType}>{translateMealType(item.meal_type)}</Text>
         <Text style={styles.menuName}>{item.menu_name}</Text>
-        <Text style={styles.nutrients}>{item.kcal} kcal | C: {item.carbs_g}g P: {item.protein_g}g F: {item.fat_g}g</Text>
+        <Text style={styles.nutrients}>{item.kcal} kcal | 탄:{item.carbs_g}g 단:{item.protein_g}g 지:{item.fat_g}g</Text>
       </View>
       <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.deleteButton}>
         <Trash2 size={20} color="#ff4444" />
@@ -67,9 +77,9 @@ export default function HistoryScreen() {
       />
       
       <View style={styles.historyHeader}>
-        <Text style={styles.historyTitle}>Meals on {selectedDate}</Text>
+        <Text style={styles.historyTitle}>{selectedDate} 식단</Text>
         <Text style={styles.summaryText}>
-          Total: {meals.reduce((sum, m) => sum + m.kcal, 0).toFixed(0)} kcal
+          총: {meals.reduce((sum, m) => sum + m.kcal, 0).toFixed(0)} kcal
         </Text>
       </View>
 
@@ -78,7 +88,7 @@ export default function HistoryScreen() {
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderMealItem}
         contentContainerStyle={styles.listContainer}
-        ListEmptyComponent={<Text style={styles.emptyText}>No meals logged for this day.</Text>}
+        ListEmptyComponent={<Text style={styles.emptyText}>이 날 기록된 식단이 없습니다.</Text>}
       />
     </View>
   );

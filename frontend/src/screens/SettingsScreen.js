@@ -35,16 +35,16 @@ export default function SettingsScreen({ navigation }) {
     };
 
     if (Object.values(formattedGoals).some(isNaN)) {
-      Alert.alert("Error", "Please enter valid numbers for all goals.");
+      Alert.alert("오류", "모든 목표 수치에 올바른 숫자를 입력해주세요.");
       return;
     }
 
     try {
       await updateGoals(formattedGoals);
-      Alert.alert("Success", "Goals updated successfully!");
+      Alert.alert("성공", "목표가 업데이트되었습니다!");
       navigation.goBack();
     } catch (error) {
-      Alert.alert("Error", "Failed to update goals.");
+      Alert.alert("오류", "목표 업데이트에 실패했습니다.");
     }
   };
 
@@ -56,24 +56,24 @@ export default function SettingsScreen({ navigation }) {
         value={goals[key]}
         onChangeText={(text) => setGoals({ ...goals, [key]: text })}
         keyboardType="numeric"
-        placeholder={`Enter ${label.toLowerCase()}`}
+        placeholder={`${label} 입력`}
       />
     </View>
   );
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Set Daily Goals 🎯</Text>
-      <Text style={styles.subtitle}>Define your daily nutrient targets to track your progress.</Text>
+      <Text style={styles.title}>일일 목표 설정 🎯</Text>
+      <Text style={styles.subtitle}>매일 섭취할 영양소 목표를 설정하여 진행 상황을 추적하세요.</Text>
       
-      {renderInput("Calories", "target_kcal", "kcal")}
-      {renderInput("Carbohydrates", "target_carbs", "g")}
-      {renderInput("Protein", "target_protein", "g")}
-      {renderInput("Fat", "target_fat", "g")}
+      {renderInput("칼로리", "target_kcal", "kcal")}
+      {renderInput("탄수화물", "target_carbs", "g")}
+      {renderInput("단백질", "target_protein", "g")}
+      {renderInput("지방", "target_fat", "g")}
 
       <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
         <Save size={20} color="#fff" />
-        <Text style={styles.saveButtonText}>Save Goals</Text>
+        <Text style={styles.saveButtonText}>목표 저장하기</Text>
       </TouchableOpacity>
     </ScrollView>
   );
