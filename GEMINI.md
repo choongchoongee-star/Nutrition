@@ -12,6 +12,7 @@
 - **CI/CD:** GitHub Actions (Auto-deploy to GitHub Pages)
 
 ## Recent Progress (Last 5 Logs)
+- **2026-03-07:** Migrating backend to Vercel (v2.5) to fix persistent CORS/404 issues on Render. Added `vercel.json` and optimized for serverless.
 - **2026-03-07:** Upgraded to Backend v2.3 & Frontend v1.0.2. Added redundant `/health` and `/api/v1/health` paths and reinforced CORS headers for 404/500 scenarios.
 - **2026-03-07:** Unified API paths to `/api/v1/` and forced CORS headers on all responses (including 404/500) to fix intermittent browser blocks.
 - **2026-03-07:** Implemented anti-timeout measures: server wake-up ping, 90s axios timeout, and square cropping (0.6 quality) to reduce payload.
