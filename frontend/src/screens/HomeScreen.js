@@ -8,14 +8,14 @@ import { Camera, Image as ImageIcon, Save } from 'lucide-react-native';
 import ProgressBar from '../components/ProgressBar';
 import { useFocusEffect } from '@react-navigation/native';
 
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+// v1beta 대신 v1 정식 엔드포인트를 사용합니다.
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent";
 
 export default function HomeScreen({ navigation }) {
   const [image, setImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   
-  // process.env 값이 없을 경우 콘솔에 경고 표시
   const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_API_KEY || ""; 
 
   const [dailyStats, setDailyStats] = useState({ kcal: 0, carbs: 0, protein: 0, fat: 0 });
@@ -75,15 +75,10 @@ export default function HomeScreen({ navigation }) {
   };
 
   const analyzeFood = async () => {
-    console.log("Analyze button pressed!"); // 로그 추가
-    if (!image) {
-      console.log("No image selected");
-      return;
-    }
+    console.log("Analyze attempt with v1 endpoint...");
+    if (!image) return;
     
     const apiKey = GOOGLE_API_KEY; 
-    console.log("API Key exists:", !!apiKey); // 키 존재 여부 로그
-
     if (!apiKey) {
       Alert.alert("API Key Missing", "환경 설정에서 API Key를 확인하세요.");
       return;
@@ -93,11 +88,8 @@ export default function HomeScreen({ navigation }) {
     setResult(null);
 
     try {
-      console.log("Fetching image blob...");
       const response = await fetch(image);
       const blob = await response.blob();
-      
-      console.log("Converting to base64...");
       const base64Data = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result.split(',')[1]);
@@ -105,8 +97,7 @@ export default function HomeScreen({ navigation }) {
         reader.readAsDataURL(blob);
       });
 
-      console.log("Calling Gemini API...");
-      const prompt = "음식 영양 분석 (결과만 JSON): {'menu_name':str, 'weight_g':float, 'kcal':float, 'carbs_g':float, 'protein_g':float, 'fat_g':float}";
+      const prompt = "Analyze food from image and return ONLY JSON: {'menu_name':str, 'weight_g':float, 'kcal':float, 'carbs_g':float, 'protein_g':float, 'fat_g':float}";
       
       const apiResponse = await axios.post(`${GEMINI_API_URL}?key=${apiKey}`, {
         contents: [{
@@ -116,12 +107,9 @@ export default function HomeScreen({ navigation }) {
           ]
         }],
         generationConfig: { temperature: 0.1, maxOutputTokens: 500 }
-      }, { timeout: 60000 });
+      });
 
-      console.log("Gemini API Response received!");
       const txt = apiResponse.data.candidates[0].content.parts[0].text;
-      console.log("Raw text from AI:", txt);
-      
       const start = txt.find('{');
       const end = txt.rfind('}') + 1;
       const jsonStr = txt.substring(start, end);
@@ -129,8 +117,9 @@ export default function HomeScreen({ navigation }) {
       
       setResult(data);
     } catch (error) {
-      console.error("Direct Analysis Detailed Error:", error);
-      Alert.alert("Analysis Failed", error.message || "분석 실패");
+      console.error("Gemini API Error:", error.response?.data || error.message);
+      const serverMsg = error.response?.data?.error?.message || "분석 실패";
+      Alert.alert("Analysis Failed", `Reason: ${serverMsg}`);
     } finally {
       setLoading(false);
     }
@@ -181,7 +170,7 @@ export default function HomeScreen({ navigation }) {
 
       {image && !loading && !result && (
         <TouchableOpacity style={styles.analyzeButton} onPress={analyzeFood}>
-          <Text style={styles.buttonText}>Start AI Analysis (Direct)</Text>
+          <Text style={styles.buttonText}>Start AI Analysis (v1)</Text>
         </TouchableOpacity>
       )}
 
@@ -201,7 +190,7 @@ export default function HomeScreen({ navigation }) {
       )}
 
       <View style={{ marginTop: 30, alignItems: 'center', opacity: 0.3 }}>
-        <Text style={{ fontSize: 10 }}>v1.1.1 (Direct Mode - Debugging)</Text>
+        <Text style={{ fontSize: 10 }}>v1.1.2 (Direct Mode - Stability)</Text>
       </View>
     </ScrollView>
   );
