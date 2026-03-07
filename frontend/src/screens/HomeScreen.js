@@ -8,15 +8,15 @@ import { Camera, Image as ImageIcon, Save } from 'lucide-react-native';
 import ProgressBar from '../components/ProgressBar';
 import { useFocusEffect } from '@react-navigation/native';
 
-// 사용자 리스트에 있는 Gemini 2.0 Flash 모델을 정확히 타겟팅합니다.
-const MODEL_ID = "gemini-2.0-flash"; 
+// 2026년 3월 기준, 리스트에 있는 최신 상용 모델인 2.5 Flash를 사용합니다.
+const MODEL_ID = "gemini-2.5-flash"; 
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_ID}:generateContent`;
 
 export default function HomeScreen({ navigation }) {
   const [image, setImage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
-  const [errorLog, setErrorLog] = useState(null); // 에러를 화면에 보여주기 위한 상태
+  const [errorLog, setErrorLog] = useState(null); 
   
   const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_API_KEY || ""; 
 
@@ -42,7 +42,7 @@ export default function HomeScreen({ navigation }) {
     if (pickerResult.canceled) return;
     setImage(pickerResult.assets[0].uri);
     setResult(null);
-    setErrorLog(null); // 새로운 이미지 선택 시 에러 초기화
+    setErrorLog(null);
   };
 
   const pickImage = async () => {
@@ -94,7 +94,6 @@ export default function HomeScreen({ navigation }) {
       setResult(JSON.parse(txt.substring(start, end)));
     } catch (error) {
       console.error("Gemini Error:", error);
-      // 에러 전문을 문자열로 변환하여 저장
       const detail = error.response?.data ? JSON.stringify(error.response.data, null, 2) : error.message;
       setErrorLog(`ERROR [${MODEL_ID}]: ${detail}`);
     } finally {
@@ -139,13 +138,12 @@ export default function HomeScreen({ navigation }) {
 
       {image && !loading && !result && (
         <TouchableOpacity style={styles.analyzeButton} onPress={analyzeFood}>
-          <Text style={styles.buttonText}>Start Analysis (Gemini 2.0)</Text>
+          <Text style={styles.buttonText}>Start Analysis (Gemini 2.5)</Text>
         </TouchableOpacity>
       )}
 
       {loading && <ActivityIndicator size="large" color="#007bff" style={{ marginTop: 20 }} />}
 
-      {/* 에러 로그 출력 창 (매우 중요) */}
       {errorLog && (
         <View style={styles.errorContainer}>
           <Text style={styles.errorTitle}>⚠️ API Error Report</Text>
@@ -169,7 +167,7 @@ export default function HomeScreen({ navigation }) {
       )}
 
       <View style={{ marginTop: 30, alignItems: 'center', opacity: 0.3 }}>
-        <Text style={{ fontSize: 10 }}>v1.1.6 (Gemini 2.0 - Error Monitoring Mode)</Text>
+        <Text style={{ fontSize: 10 }}>v1.1.7 (Latest Model: Gemini 2.5 Flash)</Text>
       </View>
     </ScrollView>
   );
