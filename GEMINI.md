@@ -13,6 +13,7 @@
 
 ## Recent Progress (Last 5 Logs)
 - **2026-03-07:** Conducted security audit. No hardcoded keys found. Improved `frontend/.gitignore` to strictly exclude all `.env` variants.
+- **2026-03-07:** Implemented `Safety Middleware` (v3.4) to catch all unhandled exceptions and ensure CORS headers are always present. Added null-checks for DB results to prevent `IndexError`.
 - **2026-03-07:** Performed a full code integrity check and restored missing `weight_g` field in Backend v3.3. Refactored for conciseness while ensuring all features remain intact.
 - **2026-03-07:** Reinforced CORS policies and implemented detailed DB error reporting (v3.2) to debug cloud storage issues. Added double-layered CORS protection.
 - **2026-03-07:** Migrated to Cloud Database (Supabase) via Backend v3.0. Replaced local `AsyncStorage` with persistent REST API calls for meals and goals.
