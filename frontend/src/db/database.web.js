@@ -52,8 +52,8 @@ export const saveMeal = async (meal) => {
       ...textData, 
       id: Date.now(), 
       timestamp: new Date().toISOString(),
-      // 이미지는 용량 문제로 웹에서는 저장 제외 (필요 시 나중에 클라우드 저장 도입)
-      image_uri: (image_uri && image_uri.length < 1000) ? image_uri : null 
+      // 썸네일 압축 이미지를 허용하도록 길이 제한을 10만 자(약 75KB)로 늘림
+      image_uri: (image_uri && image_uri.length < 100000) ? image_uri : null 
     };
     
     meals.push(finalMeal);

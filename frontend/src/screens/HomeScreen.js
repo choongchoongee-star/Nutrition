@@ -106,14 +106,48 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
+  // 썸네일 생성 함수 (로컬 스토리지 용량 절약)
+  const compressImageForStorage = (uri) => {
+    return new Promise((resolve) => {
+      if (Platform.OS !== 'web') {
+        resolve(uri); // 네이티브 앱은 파일 시스템을 쓰므로 그대로 반환
+        return;
+      }
+      
+      const img = new window.Image();
+      img.crossOrigin = "Anonymous";
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_SIZE = 150; // 150px 초소형 썸네일
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
+        } else {
+          if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        // 품질을 30%로 극한 압축
+        resolve(canvas.toDataURL('image/jpeg', 0.3));
+      };
+      img.onerror = () => resolve(null);
+      img.src = uri;
+    });
+  };
+
   const handleSave = async () => {
-    console.log("Confirm & Log button pressed");
-    if (!result) {
-      console.log("No result to save");
-      return;
-    }
+    if (!result) return;
+    setLoading(true);
 
     try {
+      // 용량 문제 해결을 위해 이미지 썸네일화 진행
+      const thumbnailUri = await compressImageForStorage(image);
+
       const mealData = {
         date: formatDate(new Date()),
         meal_type: suggestMealType(new Date().getHours()),
@@ -122,19 +156,20 @@ export default function HomeScreen({ navigation }) {
         carbs_g: result.carbs_g,
         protein_g: result.protein_g,
         fat_g: result.fat_g,
-        image_uri: image
+        image_uri: thumbnailUri // 압축된 이미지 저장
       };
       
-      console.log("Saving meal data:", mealData);
       await saveMeal(mealData);
       
       Alert.alert("Success", "Meal logged successfully!");
       setResult(null);
       setImage(null);
-      loadDailyProgress(); // 대시보드 새로고침
+      loadDailyProgress();
     } catch (error) {
       console.error("Save Meal Error:", error);
       Alert.alert("Save Failed", `Reason: ${error.message}`);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -190,7 +225,7 @@ export default function HomeScreen({ navigation }) {
       )}
 
       <View style={{ marginTop: 30, alignItems: 'center', opacity: 0.3 }}>
-        <Text style={{ fontSize: 10 }}>v1.1.9 (Storage & Logging Fix)</Text>
+        <Text style={{ fontSize: 10 }}>v1.2.1 (Thumbnail Save Mode)</Text>
       </View>
     </ScrollView>
   );
