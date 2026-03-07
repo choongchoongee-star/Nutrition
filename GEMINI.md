@@ -13,6 +13,7 @@
 
 ## Recent Progress (Last 5 Logs)
 - **2026-03-07:** Conducted security audit. No hardcoded keys found. Improved `frontend/.gitignore` to strictly exclude all `.env` variants.
+- **2026-03-07:** Migrated to Cloud Database (Supabase) via Backend v3.0. Replaced local `AsyncStorage` with persistent REST API calls for meals and goals.
 - **2026-03-07:** Fixed critical syntax error in `main.py` (v2.9) that caused Vercel function crash. Restored full REST API logic.
 - **2026-03-07:** Implemented Thumbnail Compression (v1.2.1) to allow saving images to local storage without exceeding quota. Acknowledged need for cloud DB in the future.
 - **2026-03-07:** Resolved `QuotaExceededError` (v1.2.0) by excluding large image data from `AsyncStorage` on the web. Implemented auto-cleanup logic for existing bloated records.

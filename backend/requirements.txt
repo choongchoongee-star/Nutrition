@@ -9,3 +9,4 @@ databases
 python-multipart
 requests
 starlette
+supabase
