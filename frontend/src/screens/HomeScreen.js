@@ -8,8 +8,9 @@ import { Camera, Image as ImageIcon, Save } from 'lucide-react-native';
 import ProgressBar from '../components/ProgressBar';
 import { useFocusEffect } from '@react-navigation/native';
 
-// v1beta가 이미지 분석에 더 안정적일 수 있습니다.
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+// 2026년 기준 리스트에 있는 Gemini 2.0 Flash 모델을 사용합니다.
+const MODEL_ID = "gemini-2.0-flash"; 
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_ID}:generateContent`;
 
 export default function HomeScreen({ navigation }) {
   const [image, setImage] = useState(null);
@@ -75,7 +76,7 @@ export default function HomeScreen({ navigation }) {
   };
 
   const analyzeFood = async () => {
-    console.log("Analyze attempt with v1beta...");
+    console.log(`Analyze attempt with ${MODEL_ID}...`);
     if (!image) return;
     
     const apiKey = GOOGLE_API_KEY; 
@@ -109,7 +110,6 @@ export default function HomeScreen({ navigation }) {
         generationConfig: { temperature: 0.1, maxOutputTokens: 500 }
       });
 
-      console.log("API Success!");
       const txt = apiResponse.data.candidates[0].content.parts[0].text;
       const start = txt.find('{');
       const end = txt.rfind('}') + 1;
@@ -118,11 +118,11 @@ export default function HomeScreen({ navigation }) {
       
       setResult(data);
     } catch (error) {
-      console.error("Full Error Object:", error.response?.data);
+      console.error("Gemini API Error Detail:", error.response?.data || error.message);
       const serverError = error.response?.data?.error;
       const errorMsg = serverError ? `${serverError.code}: ${serverError.message}` : error.message;
       
-      Alert.alert("Analysis Failed", `Reason: ${errorMsg}\n\nTip: Check if 'Generative Language API' is enabled in Google Cloud Console.`);
+      Alert.alert("Analysis Failed", `Reason: ${errorMsg}\n\nModel used: ${MODEL_ID}`);
     } finally {
       setLoading(false);
     }
@@ -173,7 +173,7 @@ export default function HomeScreen({ navigation }) {
 
       {image && !loading && !result && (
         <TouchableOpacity style={styles.analyzeButton} onPress={analyzeFood}>
-          <Text style={styles.buttonText}>Start AI Analysis (v1beta)</Text>
+          <Text style={styles.buttonText}>Start Analysis (Gemini 2.0)</Text>
         </TouchableOpacity>
       )}
 
@@ -193,7 +193,7 @@ export default function HomeScreen({ navigation }) {
       )}
 
       <View style={{ marginTop: 30, alignItems: 'center', opacity: 0.3 }}>
-        <Text style={{ fontSize: 10 }}>v1.1.3 (Direct Mode - Beta Endpoint)</Text>
+        <Text style={{ fontSize: 10 }}>v1.1.4 (Latest Model: Gemini 2.0)</Text>
       </View>
     </ScrollView>
   );
