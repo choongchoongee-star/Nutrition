@@ -18,7 +18,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-logger.info("--- Starting Nutrition AI Backend (Version 2.2) ---")
+logger.info("--- Starting Nutrition AI Backend (Version 2.3) ---")
 
 load_dotenv()
 
@@ -36,9 +36,7 @@ model = genai.GenerativeModel('gemini-1.5-flash', safety_settings=safety_setting
 
 app = FastAPI(title="Nutrition AI API")
 
-# Robust CORS Configuration
-# Note: In FastAPI, the LAST middleware added is the FIRST one to handle the request.
-# BUT CORSMiddleware is a special case. Let's add it last to be safe.
+# Robust CORS Configuration - MUST be added first
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -56,18 +54,17 @@ async def global_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
         status_code=500,
         content={"error": "Internal Server Error", "detail": str(exc)},
-        headers={"Access-Control-Allow-Origin": "*"} # Manual addition for safety
+        headers={"Access-Control-Allow-Origin": "*"}
     )
 
-# Middleware for request logging
+# Middleware for request logging and forcing CORS headers
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     logger.info(f"INCOMING: {request.method} {request.url}")
     response = await call_next(request)
     logger.info(f"OUTGOING: {response.status_code}")
     # Force CORS header if missing (common in 404/500 cases)
-    if "Access-Control-Allow-Origin" not in response.headers:
-        response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Origin"] = "*"
     return response
 
 class NutritionInfo(BaseModel):
@@ -78,14 +75,17 @@ class NutritionInfo(BaseModel):
     protein_g: float
     fat_g: float
 
-# Group all routes under /api/v1 to avoid root path confusion and 404s
+# Routes
 @app.get("/")
 async def root():
-    return {"status": "ok", "message": "Nutrition API v2.2"}
+    return {"status": "ok", "message": "Nutrition API v2.3"}
 
+# Redundant health checks to avoid 404 regardless of path used
+@app.get("/health")
 @app.get("/api/v1/health")
 async def health_api():
-    return {"status": "healthy", "version": "2.2"}
+    logger.info("Health check hit")
+    return {"status": "healthy", "version": "2.3"}
 
 @app.post("/api/v1/analyze", response_model=NutritionInfo)
 async def analyze_food(image: UploadFile = File(...)):
@@ -115,7 +115,6 @@ async def analyze_food(image: UploadFile = File(...)):
             logger.error(f"Gemini text block: {str(e)}")
             raise HTTPException(status_code=500, detail="AI response blocked or failed")
 
-        # JSON Extraction
         if "```json" in raw_text:
             raw_text = raw_text.split("```json")[1].split("```")[0].strip()
         elif "```" in raw_text:
