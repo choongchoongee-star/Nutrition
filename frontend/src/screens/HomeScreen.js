@@ -8,8 +8,8 @@ import { Camera, Image as ImageIcon, Save } from 'lucide-react-native';
 import ProgressBar from '../components/ProgressBar';
 import { useFocusEffect } from '@react-navigation/native';
 
-const API_URL = "https://nutrition-4rtp.onrender.com/api/v1/analyze";
-const HEALTH_URL = "https://nutrition-4rtp.onrender.com/api/v1/health";
+const API_URL = "https://nutrition-choongchoongee-7456s-projects.vercel.app/api/v1/analyze";
+const HEALTH_URL = "https://nutrition-choongchoongee-7456s-projects.vercel.app/api/v1/health";
 
 export default function HomeScreen({ navigation }) {
   const [image, setImage] = useState(null);
@@ -155,7 +155,7 @@ export default function HomeScreen({ navigation }) {
       let errMsg = "Unknown error";
       
       if (error.code === 'ECONNABORTED') {
-        errMsg = "The server is taking too long (over 90s). Render.com's free tier might be waking up or struggling with the image. Please try again in a few seconds.";
+        errMsg = "The analysis is taking longer than expected. Please try again in a few seconds.";
       } else if (error.response) {
         errMsg = error.response.data?.detail || error.response.data?.error || `Server Error (${error.response.status})`;
       } else if (error.request) {
@@ -304,7 +304,7 @@ export default function HomeScreen({ navigation }) {
       )}
 
       <View style={{ marginTop: 30, alignItems: 'center', opacity: 0.3 }}>
-        <Text style={{ fontSize: 10 }}>v1.0.3 (Last Updated: 2026-03-07)</Text>
+        <Text style={{ fontSize: 10 }}>v1.0.4 (Vercel Backend - 2026-03-07)</Text>
       </View>
     </ScrollView>
   );
