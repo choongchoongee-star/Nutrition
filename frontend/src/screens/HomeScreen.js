@@ -100,8 +100,8 @@ export default function HomeScreen({ navigation }) {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
-      aspect: [1, 1], // Square aspect often results in smaller file size
-      quality: 0.6, // Further reduced for faster upload
+      aspect: [1, 1],
+      quality: 0.6,
     });
     await handleImageSource(result);
   };
@@ -142,7 +142,6 @@ export default function HomeScreen({ navigation }) {
     }
 
     try {
-      // Increased timeout to 90s to handle both Cold Start + Heavy Analysis
       const response = await axios.post(API_URL, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -157,7 +156,13 @@ export default function HomeScreen({ navigation }) {
       if (error.code === 'ECONNABORTED') {
         errMsg = "The analysis is taking longer than expected. Please try again in a few seconds.";
       } else if (error.response) {
-        errMsg = error.response.data?.detail || error.response.data?.error || `Server Error (${error.response.status})`;
+        // Server responded with non-2xx code
+        const data = error.response.data;
+        // 서버에서 전달한 구체적인 에러 메시지가 있으면 우선적으로 표시
+        errMsg = data?.error || data?.detail || `Server Error (${error.response.status})`;
+        if (data?.detail && typeof data.detail === 'object') {
+            errMsg += "\n" + JSON.stringify(data.detail);
+        }
       } else if (error.request) {
         errMsg = "Cannot reach the server. Please check your internet or wait for the backend to wake up.";
       } else {
@@ -304,7 +309,7 @@ export default function HomeScreen({ navigation }) {
       )}
 
       <View style={{ marginTop: 30, alignItems: 'center', opacity: 0.3 }}>
-        <Text style={{ fontSize: 10 }}>v1.0.5 (Vercel Backend - 2026-03-07)</Text>
+        <Text style={{ fontSize: 10 }}>v1.0.6 (REST Backend - 2026-03-07)</Text>
       </View>
     </ScrollView>
   );
