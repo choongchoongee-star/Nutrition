@@ -38,6 +38,7 @@ jobs:
         working-directory: ./frontend
         env:
           EXPO_PUBLIC_BASE_URL: /Nutrition
+          EXPO_PUBLIC_GOOGLE_API_KEY: ${{ secrets.EXPO_PUBLIC_GOOGLE_API_KEY }}
         run: npx expo export -p web
 
       - name: Fix absolute paths in index.html

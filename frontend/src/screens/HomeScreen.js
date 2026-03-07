@@ -8,7 +8,6 @@ import { Camera, Image as ImageIcon, Save } from 'lucide-react-native';
 import ProgressBar from '../components/ProgressBar';
 import { useFocusEffect } from '@react-navigation/native';
 
-// 이제 백엔드 주소 대신 Google API 주소를 직접 사용합니다.
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
 
 export default function HomeScreen({ navigation }) {
@@ -16,11 +15,9 @@ export default function HomeScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   
-  // API Key 관리 (환경 변수에서 가져오거나 나중에 설정에서 입력받을 수 있습니다)
-  // 보안을 위해 실제 배포 시에는 환경 변수 설정을 권장합니다.
+  // process.env 값이 없을 경우 콘솔에 경고 표시
   const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_API_KEY || ""; 
 
-  // Progress tracking state
   const [dailyStats, setDailyStats] = useState({ kcal: 0, carbs: 0, protein: 0, fat: 0 });
   const [goals, setGoals] = useState({ target_kcal: 2000, target_carbs: 250, target_protein: 60, target_fat: 50 });
 
@@ -78,12 +75,17 @@ export default function HomeScreen({ navigation }) {
   };
 
   const analyzeFood = async () => {
-    if (!image) return;
+    console.log("Analyze button pressed!"); // 로그 추가
+    if (!image) {
+      console.log("No image selected");
+      return;
+    }
     
-    // API KEY 체크 (중요!)
     const apiKey = GOOGLE_API_KEY; 
+    console.log("API Key exists:", !!apiKey); // 키 존재 여부 로그
+
     if (!apiKey) {
-      Alert.alert("API Key Missing", "Gemini API Key가 설정되지 않았습니다. 개발 환경 변수를 확인하세요.");
+      Alert.alert("API Key Missing", "환경 설정에서 API Key를 확인하세요.");
       return;
     }
 
@@ -91,16 +93,19 @@ export default function HomeScreen({ navigation }) {
     setResult(null);
 
     try {
-      // 1. 이미지 데이터를 Base64로 변환
+      console.log("Fetching image blob...");
       const response = await fetch(image);
       const blob = await response.blob();
-      const base64Data = await new Promise((resolve) => {
+      
+      console.log("Converting to base64...");
+      const base64Data = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
         reader.readAsDataURL(blob);
       });
 
-      // 2. Gemini API 직접 호출 (서버 타임아웃 걱정 없음!)
+      console.log("Calling Gemini API...");
       const prompt = "음식 영양 분석 (결과만 JSON): {'menu_name':str, 'weight_g':float, 'kcal':float, 'carbs_g':float, 'protein_g':float, 'fat_g':float}";
       
       const apiResponse = await axios.post(`${GEMINI_API_URL}?key=${apiKey}`, {
@@ -110,21 +115,22 @@ export default function HomeScreen({ navigation }) {
             { inline_data: { mime_type: "image/jpeg", data: base64Data } }
           ]
         }],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 300 }
-      }, { timeout: 60000 }); // 60초까지 넉넉하게 대기 가능
+        generationConfig: { temperature: 0.1, maxOutputTokens: 500 }
+      }, { timeout: 60000 });
 
+      console.log("Gemini API Response received!");
       const txt = apiResponse.data.candidates[0].content.parts[0].text;
+      console.log("Raw text from AI:", txt);
       
-      // JSON 추출
       const start = txt.find('{');
-      const end = txt.rfind('}');
-      const jsonStr = txt.substring(start, end + 1);
+      const end = txt.rfind('}') + 1;
+      const jsonStr = txt.substring(start, end);
       const data = JSON.parse(jsonStr);
       
       setResult(data);
     } catch (error) {
-      console.error("Direct Analysis Error:", error);
-      Alert.alert("Analysis Failed", "AI 분석에 실패했습니다. 네트워크 상태나 API 키를 확인하세요.");
+      console.error("Direct Analysis Detailed Error:", error);
+      Alert.alert("Analysis Failed", error.message || "분석 실패");
     } finally {
       setLoading(false);
     }
@@ -160,8 +166,12 @@ export default function HomeScreen({ navigation }) {
         <ProgressBar label="Fat" current={dailyStats.fat} target={goals.target_fat} color="#FFD93D" />
       </View>
       
-      {image ? <Image source={{ uri: image }} style={styles.image} /> : (
-        <View style={styles.placeholder}><Text>Select a food photo</Text></View>
+      {image ? (
+        <Image source={{ uri: image }} style={styles.image} />
+      ) : (
+        <View style={styles.placeholder}>
+          <Text style={{color: '#888'}}>Select a food photo</Text>
+        </View>
       )}
 
       <View style={styles.buttonContainer}>
@@ -170,7 +180,7 @@ export default function HomeScreen({ navigation }) {
       </View>
 
       {image && !loading && !result && (
-        <TouchableOpacity style={[styles.button, styles.analyzeButton]} onPress={analyzeFood}>
+        <TouchableOpacity style={styles.analyzeButton} onPress={analyzeFood}>
           <Text style={styles.buttonText}>Start AI Analysis (Direct)</Text>
         </TouchableOpacity>
       )}
@@ -191,7 +201,7 @@ export default function HomeScreen({ navigation }) {
       )}
 
       <View style={{ marginTop: 30, alignItems: 'center', opacity: 0.3 }}>
-        <Text style={{ fontSize: 10 }}>v1.1.0 (Direct AI Mode - No Server Timeout)</Text>
+        <Text style={{ fontSize: 10 }}>v1.1.1 (Direct Mode - Debugging)</Text>
       </View>
     </ScrollView>
   );
@@ -202,7 +212,7 @@ const styles = StyleSheet.create({
   progressCard: { backgroundColor: '#f8f9fa', borderRadius: 20, padding: 20, marginBottom: 25 },
   cardTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 15 },
   image: { width: '100%', height: 300, borderRadius: 20, marginBottom: 15 },
-  placeholder: { width: '100%', height: 300, backgroundColor: '#f0f0f0', borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 15 },
+  placeholder: { width: '100%', height: 300, backgroundColor: '#f0f0f0', borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 15, borderStyle: 'dashed', borderWidth: 1, borderColor: '#ddd' },
   buttonContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
   iconButton: { backgroundColor: '#007bff', padding: 12, borderRadius: 12, flexDirection: 'row', alignItems: 'center', flex: 0.48, justifyContent: 'center' },
   buttonText: { color: '#fff', fontWeight: '600', marginLeft: 8 },

@@ -14,6 +14,7 @@
 ## Recent Progress (Last 5 Logs)
 - **2026-03-07:** Conducted security audit. No hardcoded keys found. Improved `frontend/.gitignore` to strictly exclude all `.env` variants.
 - **2026-03-07:** Fixed critical syntax error in `main.py` (v2.9) that caused Vercel function crash. Restored full REST API logic.
+- **2026-03-07:** Fixed UI button unresponsiveness by correcting undefined styles. Updated GitHub Actions (`deploy.yml`) to properly inject `EXPO_PUBLIC_GOOGLE_API_KEY` during build.
 - **2026-03-07:** Migrated backend to direct REST API calls (v2.7) to fix 500 errors caused by heavy library initialization in Vercel. Added detailed error reporting in v1.0.6.
 - **2026-03-07:** Migrating backend to Vercel (v2.5) to fix persistent CORS/404 issues on Render. Added `vercel.json` and optimized for serverless.
 - **2026-03-07:** Upgraded to Backend v2.3 & Frontend v1.0.2. Added redundant `/health` and `/api/v1/health` paths and reinforced CORS headers for 404/500 scenarios.
