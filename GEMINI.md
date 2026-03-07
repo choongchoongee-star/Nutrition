@@ -15,6 +15,7 @@
 - **2026-03-07:** Conducted security audit. No hardcoded keys found. Improved `frontend/.gitignore` to strictly exclude all `.env` variants.
 - **2026-03-07:** Migrated backend to direct Supabase REST API calls (v3.7) to resolve 500 errors caused by library-serverless conflicts. Implemented PostgREST pattern for better stability.
 - **2026-03-07:** Upgraded to Backend v3.6 (Ultra Debug). Replaced direct list indexing with safe null-checks to prevent `IndexError`. Implemented global exception transparency to expose exact DB error reasons to the client.
+- **2026-03-07:** Replaced the entire backend with a Zero-Dependency REST pattern (v3.8) to eliminate library-induced 500 errors. Forced raw error reporting for Supabase connectivity issues.
 - **2026-03-07:** Completed full UI localization to Korean across all screens (Home, History, Settings) and navigation tabs.
 - **2026-03-07:** Localized the entire service to Korean (v1.3.0). Resolved 422 Unprocessable Content errors by aligning frontend data types with backend Pydantic models.
 - **2026-03-07:** Implemented `Safety Middleware` (v3.4) to catch all unhandled exceptions and ensure CORS headers are always present. Added null-checks for DB results to prevent `IndexError`.
