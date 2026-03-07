@@ -8,3 +8,4 @@ sqlalchemy
 databases
 python-multipart
 requests
+starlette

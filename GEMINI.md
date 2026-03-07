@@ -12,6 +12,7 @@
 - **CI/CD:** GitHub Actions (Auto-deploy to GitHub Pages)
 
 ## Recent Progress (Last 5 Logs)
+- **2026-03-07:** Unified API paths to `/api/v1/` and forced CORS headers on all responses (including 404/500) to fix intermittent browser blocks.
 - **2026-03-07:** Implemented anti-timeout measures: server wake-up ping, 90s axios timeout, and square cropping (0.6 quality) to reduce payload.
 - **2026-03-07:** Resolved recurring CORS and 500 errors by making `CORSMiddleware` outermost and reducing frontend image payload quality (0.7).
 - **2026-03-07:** Fixed Render.com backend connectivity by implementing dynamic `$PORT` handling in Dockerfile.

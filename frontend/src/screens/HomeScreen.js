@@ -9,7 +9,7 @@ import ProgressBar from '../components/ProgressBar';
 import { useFocusEffect } from '@react-navigation/native';
 
 const API_URL = "https://nutrition-4rtp.onrender.com/api/v1/analyze";
-const HEALTH_URL = "https://nutrition-4rtp.onrender.com/health";
+const HEALTH_URL = "https://nutrition-4rtp.onrender.com/api/v1/health";
 
 export default function HomeScreen({ navigation }) {
   const [image, setImage] = useState(null);
