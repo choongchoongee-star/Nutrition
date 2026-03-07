@@ -12,11 +12,11 @@
 - **CI/CD:** GitHub Actions (Auto-deploy to GitHub Pages)
 
 ## Recent Progress (Last 5 Logs)
+- **2026-03-07:** Resolved recurring CORS and 500 errors by making `CORSMiddleware` outermost and reducing frontend image payload quality (0.7).
 - **2026-03-07:** Fixed Render.com backend connectivity by implementing dynamic `$PORT` handling in Dockerfile.
 - **2026-03-07:** Improved UX with Bottom Tab Navigation and fixed broken calendar assets with Lucide icons.
 - **2026-03-07:** Isolated native modules via `.web.js` extensions to resolve web-build crashes (`ExpoSQLite`).
 - **2026-03-07:** Implemented dual-storage persistence (SQLite/AsyncStorage) for logs and nutrient goals.
-- **2026-03-07:** Enhanced Backend with robust CORS policies and detailed error traceback responses.
 
 ## Upcoming Tasks
 - [ ] Monitor Render.com backend stability and logs.

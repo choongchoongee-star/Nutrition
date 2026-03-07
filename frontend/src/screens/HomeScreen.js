@@ -82,7 +82,7 @@ export default function HomeScreen({ navigation }) {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'], // Safe for modern Expo and prevents deprecation warning
       allowsEditing: true,
-      quality: 1,
+      quality: 0.7, // Reduced quality to prevent huge payloads
     });
     await handleImageSource(result);
   };
@@ -96,7 +96,7 @@ export default function HomeScreen({ navigation }) {
 
     let result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
-      quality: 1,
+      quality: 0.7, // Reduced quality to prevent huge payloads
     });
     await handleImageSource(result);
   };
@@ -127,12 +127,26 @@ export default function HomeScreen({ navigation }) {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        timeout: 60000, // 60 seconds timeout
       });
       setResult(response.data);
     } catch (error) {
-      console.error(error);
-      const errMsg = error.response?.data?.detail || error.message || "Unknown error";
-      Alert.alert("Analysis Error", `Reason: ${errMsg}`);
+      console.error("Analysis Error:", error);
+      let errMsg = "Unknown error";
+      
+      if (error.code === 'ECONNABORTED') {
+        errMsg = "Analysis took too long. Please try again with a smaller image or better connection.";
+      } else if (error.response) {
+        // Server responded with non-2xx code
+        errMsg = error.response.data?.detail || error.response.data?.error || `Server Error (${error.response.status})`;
+      } else if (error.request) {
+        // Request made but no response received (CORS or Network issue)
+        errMsg = "No response from server. This might be a temporary network issue or CORS restriction.";
+      } else {
+        errMsg = error.message;
+      }
+      
+      Alert.alert("Analysis Failed", errMsg);
     } finally {
       setLoading(false);
     }
