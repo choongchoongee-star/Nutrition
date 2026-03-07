@@ -25,11 +25,14 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
 # Initialize Supabase Client
 supabase: Client = None
-if SUPABASE_URL and SUPABASE_KEY:
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-    logger.info("Supabase client initialized")
-else:
-    logger.warning("Supabase credentials missing. DB features will be disabled.")
+try:
+    if SUPABASE_URL and SUPABASE_KEY:
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+        logger.info("Supabase client initialized successfully")
+    else:
+        logger.warning(f"Supabase credentials missing: URL={bool(SUPABASE_URL)}, KEY={bool(SUPABASE_KEY)}")
+except Exception as e:
+    logger.error(f"Failed to init Supabase: {str(e)}")
 
 app = FastAPI()
 
@@ -41,7 +44,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- Models ---
 class Meal(BaseModel):
     id: Optional[int] = None
     date: str
@@ -60,50 +62,45 @@ class Goal(BaseModel):
     target_protein: float
     target_fat: float
 
-# --- Helpers ---
 def json_res(data, status=200):
     return JSONResponse(content=data, status_code=status, headers={"Access-Control-Allow-Origin": "*"})
-
-# --- Routes ---
 
 @app.get("/api/v1/health")
 @app.get("/health")
 async def health():
     return json_res({
         "status": "online",
-        "version": "3.0 (Cloud DB Enabled)",
+        "version": "3.1 (DB Debug Mode)",
         "gemini_ready": bool(GOOGLE_API_KEY),
-        "db_ready": supabase is not None
+        "db_ready": supabase is not None,
+        "env_check": {
+            "SUPABASE_URL": bool(SUPABASE_URL),
+            "SUPABASE_KEY": bool(SUPABASE_KEY)
+        }
     })
 
 @app.post("/api/v1/analyze")
 async def analyze(image: UploadFile = File(...)):
     if not GOOGLE_API_KEY:
         return json_res({"error": "Missing API Key"}, 500)
-
     try:
         content = await image.read()
         base64_image = base64.b64encode(content).decode('utf-8')
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GOOGLE_API_KEY}"
-        
         prompt = "Return ONLY JSON: {'menu_name':str,'weight_g':float,'kcal':float,'carbs_g':float,'protein_g':float,'fat_g':float}"
         payload = {
             "contents": [{"parts": [{"text": prompt}, {"inline_data": {"mime_type": image.content_type or "image/jpeg", "data": base64_image}}]}],
             "generationConfig": {"temperature": 0.1, "maxOutputTokens": 300}
         }
-
         response = requests.post(url, json=payload, timeout=15)
         if response.status_code != 200:
             return json_res({"error": f"AI Error {response.status_code}", "detail": response.text}, 500)
-
         txt = response.json()['candidates'][0]['content']['parts'][0]['text'].strip()
         start = txt.find('{')
         end = txt.rfind('}') + 1
         return json_res(json.loads(txt[start:end]))
     except Exception as e:
         return json_res({"error": str(e)}, 500)
-
-# --- Database Endpoints ---
 
 @app.get("/api/v1/meals", response_model=List[Meal])
 async def get_meals(date: str):
@@ -127,7 +124,7 @@ async def remove_meal(meal_id: int):
 @app.get("/api/v1/goals", response_model=Goal)
 async def get_user_goals():
     if not supabase: raise HTTPException(status_code=503, detail="DB not configured")
-    response = supabase.table("goals").select("*").limit(1).execute()
+    response = supabase.table("goals").select("*").order("id", desc=True).limit(1).execute()
     if not response.data:
         return {"target_kcal": 2000, "target_carbs": 250, "target_protein": 60, "target_fat": 50}
     return response.data[0]
@@ -135,7 +132,5 @@ async def get_user_goals():
 @app.post("/api/v1/goals")
 async def set_user_goals(goal: Goal):
     if not supabase: raise HTTPException(status_code=503, detail="DB not configured")
-    # Simple logic: replace the first row
-    supabase.table("goals").delete().neq("target_kcal", -1).execute() # Clear all
     response = supabase.table("goals").insert(goal.dict()).execute()
     return response.data[0]
