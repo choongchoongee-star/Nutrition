@@ -8,8 +8,8 @@ import { Camera, Image as ImageIcon, Save } from 'lucide-react-native';
 import ProgressBar from '../components/ProgressBar';
 import { useFocusEffect } from '@react-navigation/native';
 
-// 2026년 기준 리스트에 있는 Gemini 2.0 Flash 모델을 사용합니다.
-const MODEL_ID = "gemini-2.0-flash"; 
+// 가장 범용적인 1.5 Flash 모델로 다시 시도합니다.
+const MODEL_ID = "gemini-1.5-flash"; 
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_ID}:generateContent`;
 
 export default function HomeScreen({ navigation }) {
@@ -38,52 +38,30 @@ export default function HomeScreen({ navigation }) {
     setDailyStats(stats);
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadDailyProgress();
-    }, [loadDailyProgress])
-  );
+  useFocusEffect(useCallback(() => { loadDailyProgress(); }, [loadDailyProgress]));
 
   const handleImageSource = async (pickerResult) => {
     if (pickerResult.canceled) return;
-    const asset = pickerResult.assets[0];
-    setImage(asset.uri);
+    setImage(pickerResult.assets[0].uri);
     setResult(null);
   };
 
   const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.5,
-    });
+    let result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.5 });
     await handleImageSource(result);
   };
 
   const takePhoto = async () => {
-    const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
-    if (permissionResult.granted === false) {
-      alert("Camera access denied!");
-      return;
-    }
-    let result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.5,
-    });
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) return Alert.alert("Error", "Camera access denied");
+    let result = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.5 });
     await handleImageSource(result);
   };
 
   const analyzeFood = async () => {
-    console.log(`Analyze attempt with ${MODEL_ID}...`);
     if (!image) return;
-    
     const apiKey = GOOGLE_API_KEY; 
-    if (!apiKey) {
-      Alert.alert("API Key Missing", "환경 변수 설정이 필요합니다.");
-      return;
-    }
+    if (!apiKey) return Alert.alert("Error", "API Key Missing");
 
     setLoading(true);
     setResult(null);
@@ -91,14 +69,13 @@ export default function HomeScreen({ navigation }) {
     try {
       const response = await fetch(image);
       const blob = await response.blob();
-      const base64Data = await new Promise((resolve, reject) => {
+      const base64Data = await new Promise((resolve) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result.split(',')[1]);
-        reader.onerror = reject;
         reader.readAsDataURL(blob);
       });
 
-      const prompt = "Analyze food from image and return ONLY JSON: {'menu_name':str, 'weight_g':float, 'kcal':float, 'carbs_g':float, 'protein_g':float, 'fat_g':float}";
+      const prompt = "Analyze this food and return ONLY JSON: {'menu_name':str, 'weight_g':float, 'kcal':float, 'carbs_g':float, 'protein_g':float, 'fat_g':float}";
       
       const apiResponse = await axios.post(`${GEMINI_API_URL}?key=${apiKey}`, {
         contents: [{
@@ -107,22 +84,18 @@ export default function HomeScreen({ navigation }) {
             { inline_data: { mime_type: "image/jpeg", data: base64Data } }
           ]
         }],
-        generationConfig: { temperature: 0.1, maxOutputTokens: 500 }
+        generationConfig: { temperature: 0.1 }
       });
 
       const txt = apiResponse.data.candidates[0].content.parts[0].text;
-      const start = txt.find('{');
-      const end = txt.rfind('}') + 1;
-      const jsonStr = txt.substring(start, end);
-      const data = JSON.parse(jsonStr);
-      
-      setResult(data);
+      const start = txt.indexOf('{');
+      const end = txt.lastIndexOf('}') + 1;
+      setResult(JSON.parse(txt.substring(start, end)));
     } catch (error) {
-      console.error("Gemini API Error Detail:", error.response?.data || error.message);
-      const serverError = error.response?.data?.error;
-      const errorMsg = serverError ? `${serverError.code}: ${serverError.message}` : error.message;
-      
-      Alert.alert("Analysis Failed", `Reason: ${errorMsg}\n\nModel used: ${MODEL_ID}`);
+      console.error("Gemini Error:", error.response?.data);
+      // 에러 전문을 화면에 표시하여 원인 파악 (가장 중요)
+      const errorDetail = JSON.stringify(error.response?.data || error.message, null, 2);
+      Alert.alert("Analysis Failed", `Model: ${MODEL_ID}\n\nError Detail:\n${errorDetail}`);
     } finally {
       setLoading(false);
     }
@@ -141,11 +114,11 @@ export default function HomeScreen({ navigation }) {
         fat_g: result.fat_g,
         image_uri: image
       });
-      Alert.alert("Success", "Logged!");
+      Alert.alert("Success", "Meal logged!");
       setResult(null);
       setImage(null);
       loadDailyProgress();
-    } catch (e) { Alert.alert("Error", "Save failed."); }
+    } catch (e) { Alert.alert("Error", "Save failed"); }
   };
 
   return (
@@ -158,12 +131,8 @@ export default function HomeScreen({ navigation }) {
         <ProgressBar label="Fat" current={dailyStats.fat} target={goals.target_fat} color="#FFD93D" />
       </View>
       
-      {image ? (
-        <Image source={{ uri: image }} style={styles.image} />
-      ) : (
-        <View style={styles.placeholder}>
-          <Text style={{color: '#888'}}>Select a photo</Text>
-        </View>
+      {image ? <Image source={{ uri: image }} style={styles.image} /> : (
+        <View style={styles.placeholder}><Text style={{color: '#888'}}>Select food photo</Text></View>
       )}
 
       <View style={styles.buttonContainer}>
@@ -173,7 +142,7 @@ export default function HomeScreen({ navigation }) {
 
       {image && !loading && !result && (
         <TouchableOpacity style={styles.analyzeButton} onPress={analyzeFood}>
-          <Text style={styles.buttonText}>Start Analysis (Gemini 2.0)</Text>
+          <Text style={styles.buttonText}>Start Analysis (Standard Model)</Text>
         </TouchableOpacity>
       )}
 
@@ -193,7 +162,7 @@ export default function HomeScreen({ navigation }) {
       )}
 
       <View style={{ marginTop: 30, alignItems: 'center', opacity: 0.3 }}>
-        <Text style={{ fontSize: 10 }}>v1.1.4 (Latest Model: Gemini 2.0)</Text>
+        <Text style={{ fontSize: 10 }}>v1.1.5 (Debug Mode - Full Error Report)</Text>
       </View>
     </ScrollView>
   );
