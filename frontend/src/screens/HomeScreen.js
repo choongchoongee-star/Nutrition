@@ -8,8 +8,8 @@ import { Camera, Image as ImageIcon, Save } from 'lucide-react-native';
 import ProgressBar from '../components/ProgressBar';
 import { useFocusEffect } from '@react-navigation/native';
 
-// v1beta 대신 v1 정식 엔드포인트를 사용합니다.
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent";
+// v1beta가 이미지 분석에 더 안정적일 수 있습니다.
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
 
 export default function HomeScreen({ navigation }) {
   const [image, setImage] = useState(null);
@@ -75,12 +75,12 @@ export default function HomeScreen({ navigation }) {
   };
 
   const analyzeFood = async () => {
-    console.log("Analyze attempt with v1 endpoint...");
+    console.log("Analyze attempt with v1beta...");
     if (!image) return;
     
     const apiKey = GOOGLE_API_KEY; 
     if (!apiKey) {
-      Alert.alert("API Key Missing", "환경 설정에서 API Key를 확인하세요.");
+      Alert.alert("API Key Missing", "환경 변수 설정이 필요합니다.");
       return;
     }
 
@@ -109,6 +109,7 @@ export default function HomeScreen({ navigation }) {
         generationConfig: { temperature: 0.1, maxOutputTokens: 500 }
       });
 
+      console.log("API Success!");
       const txt = apiResponse.data.candidates[0].content.parts[0].text;
       const start = txt.find('{');
       const end = txt.rfind('}') + 1;
@@ -117,9 +118,11 @@ export default function HomeScreen({ navigation }) {
       
       setResult(data);
     } catch (error) {
-      console.error("Gemini API Error:", error.response?.data || error.message);
-      const serverMsg = error.response?.data?.error?.message || "분석 실패";
-      Alert.alert("Analysis Failed", `Reason: ${serverMsg}`);
+      console.error("Full Error Object:", error.response?.data);
+      const serverError = error.response?.data?.error;
+      const errorMsg = serverError ? `${serverError.code}: ${serverError.message}` : error.message;
+      
+      Alert.alert("Analysis Failed", `Reason: ${errorMsg}\n\nTip: Check if 'Generative Language API' is enabled in Google Cloud Console.`);
     } finally {
       setLoading(false);
     }
@@ -138,7 +141,7 @@ export default function HomeScreen({ navigation }) {
         fat_g: result.fat_g,
         image_uri: image
       });
-      Alert.alert("Success", "Meal logged!");
+      Alert.alert("Success", "Logged!");
       setResult(null);
       setImage(null);
       loadDailyProgress();
@@ -159,7 +162,7 @@ export default function HomeScreen({ navigation }) {
         <Image source={{ uri: image }} style={styles.image} />
       ) : (
         <View style={styles.placeholder}>
-          <Text style={{color: '#888'}}>Select a food photo</Text>
+          <Text style={{color: '#888'}}>Select a photo</Text>
         </View>
       )}
 
@@ -170,7 +173,7 @@ export default function HomeScreen({ navigation }) {
 
       {image && !loading && !result && (
         <TouchableOpacity style={styles.analyzeButton} onPress={analyzeFood}>
-          <Text style={styles.buttonText}>Start AI Analysis (v1)</Text>
+          <Text style={styles.buttonText}>Start AI Analysis (v1beta)</Text>
         </TouchableOpacity>
       )}
 
@@ -190,7 +193,7 @@ export default function HomeScreen({ navigation }) {
       )}
 
       <View style={{ marginTop: 30, alignItems: 'center', opacity: 0.3 }}>
-        <Text style={{ fontSize: 10 }}>v1.1.2 (Direct Mode - Stability)</Text>
+        <Text style={{ fontSize: 10 }}>v1.1.3 (Direct Mode - Beta Endpoint)</Text>
       </View>
     </ScrollView>
   );
