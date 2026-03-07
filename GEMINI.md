@@ -14,6 +14,7 @@
 ## Recent Progress (Last 5 Logs)
 - **2026-03-07:** Conducted security audit. No hardcoded keys found. Improved `frontend/.gitignore` to strictly exclude all `.env` variants.
 - **2026-03-07:** Fixed critical syntax error in `main.py` (v2.9) that caused Vercel function crash. Restored full REST API logic.
+- **2026-03-07:** Resolved `QuotaExceededError` (v1.2.0) by excluding large image data from `AsyncStorage` on the web. Implemented auto-cleanup logic for existing bloated records.
 - **2026-03-07:** Fixed "Confirm & Log" button unresponsiveness (v1.1.9) by adding detailed error handling and ensuring numeric data types for storage.
 - **2026-03-07:** Successfully received AI responses and implemented Robust JSON Extraction (v1.1.8) to handle conversational or markdown-formatted API replies.
 - **2026-03-07:** Switched to `gemini-2.5-flash` and implemented On-Screen Error Monitoring (v1.1.6). This will display raw API responses directly on the UI for easier debugging.
