@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { StyleSheet, Text, View, Image, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import axios from 'axios';
-import { suggestMealType, formatDate, parseDateFromExif } from '../utils/metadata';
+import { suggestMealType, formatDate, extractDateFromUri } from '../utils/metadata';
 import { saveMeal, getMealsByDate, getGoals } from '../db/database';
 import { Camera, Image as ImageIcon, Save } from 'lucide-react-native';
 import ProgressBar from '../components/ProgressBar';
@@ -70,11 +70,14 @@ export default function HomeScreen() {
   const pickFromLibrary = async (setter, extractDate = false) => {
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.5, exif: true });
     if (!res.canceled) {
-      setter(res.assets[0].uri);
+      const asset = res.assets[0];
+      setter(asset.uri);
       setResult(null);
       setErrorLog(null);
       if (extractDate) {
-        setPhotoDate(parseDateFromExif(res.assets[0].exif)); // null이면 오늘 날짜로 폴백
+        // exifr로 blob에서 직접 파싱 (HEIC 포함) — 네이티브는 asset.exif 사용
+        const date = await extractDateFromUri(asset.uri, asset.exif);
+        setPhotoDate(date); // null이면 오늘 날짜로 폴백
       }
     }
   };

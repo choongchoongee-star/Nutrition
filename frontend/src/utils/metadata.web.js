@@ -1,16 +1,20 @@
-export const getImageMetadata = async (assetId) => {
-  return null;
-};
+import exifr from 'exifr';
 
-// EXIF DateTimeOriginal 형식: "YYYY:MM:DD HH:MM:SS"
-export const parseDateFromExif = (exif) => {
-  if (!exif) return null;
-  const raw = exif.DateTimeOriginal || exif.DateTime;
-  if (!raw) return null;
-  const datePart = raw.split(' ')[0]; // "YYYY:MM:DD"
-  const parts = datePart.split(':');
-  if (parts.length !== 3) return null;
-  return `${parts[0]}-${parts[1]}-${parts[2]}`;
+export const getImageMetadata = async () => null;
+
+// JPEG, HEIC 모두 지원 - 이미지 blob에서 직접 EXIF 날짜 추출
+export const extractDateFromUri = async (uri) => {
+  try {
+    const res = await fetch(uri);
+    const blob = await res.blob();
+    const data = await exifr.parse(blob, { pick: ['DateTimeOriginal', 'DateTime'] });
+    const dateValue = data?.DateTimeOriginal || data?.DateTime;
+    if (!dateValue) return null;
+    return formatDate(new Date(dateValue));
+  } catch (e) {
+    console.error('EXIF extraction failed:', e);
+    return null;
+  }
 };
 
 export const suggestMealType = (hour) => {
@@ -24,10 +28,8 @@ export const formatDate = (date) => {
   const d = new Date(date);
   let month = '' + (d.getMonth() + 1);
   let day = '' + d.getDate();
-  let year = d.getFullYear();
-
+  const year = d.getFullYear();
   if (month.length < 2) month = '0' + month;
   if (day.length < 2) day = '0' + day;
-
   return [year, month, day].join('-');
 };

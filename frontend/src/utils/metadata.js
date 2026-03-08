@@ -25,6 +25,11 @@ export const parseDateFromExif = (exif) => {
   return `${parts[0]}-${parts[1]}-${parts[2]}`;
 };
 
+// 네이티브에서는 expo-image-picker가 exif를 직접 제공
+export const extractDateFromUri = async (_uri, exif = null) => {
+  return parseDateFromExif(exif);
+};
+
 export const suggestMealType = (hour) => {
   if (hour >= 5 && hour < 11) return "Breakfast";
   if (hour >= 11 && hour < 15) return "Lunch";
