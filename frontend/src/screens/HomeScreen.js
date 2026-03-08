@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { StyleSheet, Text, View, Image, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Platform } from 'react-native';
+import { StyleSheet, Text, View, Image, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import axios from 'axios';
 import { getImageMetadata, suggestMealType, formatDate } from '../utils/metadata';
@@ -98,7 +98,6 @@ export default function HomeScreen({ navigation }) {
         carbs_g: Number(parsedData.carbs_g) || 0,
         protein_g: Number(parsedData.protein_g) || 0,
         fat_g: Number(parsedData.fat_g) || 0,
-        weight_g: Number(parsedData.weight_g) || 0
       });
     } catch (error) {
       setErrorLog(`분석 중 오류: ${error.message}`);
@@ -107,31 +106,10 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
-  const compressImageForStorage = (uri) => {
-    return new Promise((resolve) => {
-      if (Platform.OS !== 'web') return resolve(uri);
-      const img = new window.Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const MAX_SIZE = 150;
-        let width = img.width, height = img.height;
-        if (width > height) { if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; } }
-        else { if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; } }
-        canvas.width = width; canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.3));
-      };
-      img.onerror = () => resolve(null);
-      img.src = uri;
-    });
-  };
-
-  const handleSave = async () => {
+const handleSave = async () => {
     if (!result) return;
     setLoading(true);
     try {
-      const thumbnailUri = await compressImageForStorage(image);
       const mealData = {
         date: formatDate(new Date()),
         meal_type: suggestMealType(new Date().getHours()),
@@ -140,8 +118,6 @@ export default function HomeScreen({ navigation }) {
         carbs_g: result.carbs_g,
         protein_g: result.protein_g,
         fat_g: result.fat_g,
-        weight_g: result.weight_g,
-        image_uri: thumbnailUri
       };
       
       await saveMeal(mealData);

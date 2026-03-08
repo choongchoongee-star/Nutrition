@@ -58,19 +58,27 @@ async def add_meal(request: Request):
     }
     resp = requests.post(url, headers=headers, json=body)
     if resp.status_code not in [200, 201]:
+        logger.error(f"Supabase insert failed [{resp.status_code}]: {resp.text} | body keys: {list(body.keys())}")
         return json_res({"error": "저장 실패", "msg": resp.text}, resp.status_code)
     data = resp.json()
     return json_res(data[0] if data else body)
 
 @app.get("/api/v1/goals")
 async def get_goals():
-    url = f"{SUPABASE_URL}/rest/v1/goals?select=*&order=id.desc&limit=1"
-    headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
-    resp = requests.get(url, headers=headers)
-    data = resp.json()
-    if not data:
-        return json_res({"target_kcal": 2000, "target_carbs": 250, "target_protein": 60, "target_fat": 50})
-    return json_res(data[0])
+    default = {"target_kcal": 2000, "target_carbs": 250, "target_protein": 60, "target_fat": 50}
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/goals?select=*&order=id.desc&limit=1"
+        headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
+        resp = requests.get(url, headers=headers)
+        if resp.status_code != 200:
+            return json_res(default)
+        data = resp.json()
+        if not data or not isinstance(data, list):
+            return json_res(default)
+        return json_res(data[0])
+    except Exception as e:
+        logger.error(f"get_goals error: {e}")
+        return json_res(default)
 
 @app.post("/api/v1/analyze")
 async def analyze(image: UploadFile = File(...)):
