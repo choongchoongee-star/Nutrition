@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { StyleSheet, Text, View, Image, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import axios from 'axios';
-import { suggestMealType, formatDate } from '../utils/metadata';
+import { suggestMealType, formatDate, parseDateFromExif } from '../utils/metadata';
 import { saveMeal, getMealsByDate, getGoals } from '../db/database';
 import { Camera, Image as ImageIcon, Save } from 'lucide-react-native';
 import ProgressBar from '../components/ProgressBar';
@@ -23,6 +23,8 @@ export default function HomeScreen() {
   // Before/after mode
   const [beforeImage, setBeforeImage] = useState(null);
   const [afterImage, setAfterImage] = useState(null);
+
+  const [photoDate, setPhotoDate] = useState(null); // EXIF에서 추출한 날짜, null이면 오늘
 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -64,9 +66,17 @@ export default function HomeScreen() {
     });
   };
 
-  const pickFromLibrary = async (setter) => {
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.5 });
-    if (!res.canceled) { setter(res.assets[0].uri); setResult(null); setErrorLog(null); }
+  // extractDate=true인 경우에만 EXIF 날짜를 photoDate에 반영 (식사 전 사진 or 단일 사진)
+  const pickFromLibrary = async (setter, extractDate = false) => {
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.5, exif: true });
+    if (!res.canceled) {
+      setter(res.assets[0].uri);
+      setResult(null);
+      setErrorLog(null);
+      if (extractDate) {
+        setPhotoDate(parseDateFromExif(res.assets[0].exif)); // null이면 오늘 날짜로 폴백
+      }
+    }
   };
 
   const takePhoto = async (setter) => {
@@ -135,8 +145,9 @@ export default function HomeScreen() {
     if (!result) return;
     setLoading(true);
     try {
+      const mealDate = photoDate || formatDate(new Date());
       await saveMeal({
-        date: formatDate(new Date()),
+        date: mealDate,
         meal_type: suggestMealType(new Date().getHours()),
         menu_name: result.menu_name,
         kcal: result.kcal,
@@ -159,7 +170,7 @@ export default function HomeScreen() {
   const switchMode = (mode) => {
     setAnalysisMode(mode);
     setResult(null); setErrorLog(null);
-    setImage(null); setBeforeImage(null); setAfterImage(null);
+    setImage(null); setBeforeImage(null); setAfterImage(null); setPhotoDate(null);
   };
 
   const canAnalyze = !loading && !result && (
@@ -204,7 +215,7 @@ export default function HomeScreen() {
             : <View style={styles.placeholder}><Text style={styles.placeholderText}>음식 사진을 선택해주세요</Text></View>
           }
           <View style={styles.buttonRow}>
-            <TouchableOpacity style={styles.iconBtn} onPress={() => pickFromLibrary(setImage)}>
+            <TouchableOpacity style={styles.iconBtn} onPress={() => pickFromLibrary(setImage, true)}>
               <ImageIcon size={20} color="#fff" /><Text style={styles.btnText}>갤러리</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.iconBtn} onPress={() => takePhoto(setImage)}>
@@ -218,9 +229,9 @@ export default function HomeScreen() {
       {analysisMode === 'before_after' && (
         <View style={styles.beforeAfterRow}>
           {[
-            { label: '식사 전', uri: beforeImage, setter: setBeforeImage },
-            { label: '식사 후', uri: afterImage,  setter: setAfterImage  },
-          ].map(({ label, uri, setter }) => (
+            { label: '식사 전', uri: beforeImage, setter: setBeforeImage, extractDate: true },
+            { label: '식사 후', uri: afterImage,  setter: setAfterImage,  extractDate: false },
+          ].map(({ label, uri, setter, extractDate }) => (
             <View key={label} style={styles.slot}>
               <Text style={styles.slotLabel}>{label}</Text>
               {uri
@@ -228,7 +239,7 @@ export default function HomeScreen() {
                 : <View style={styles.slotPlaceholder}><Text style={styles.placeholderText}>사진 없음</Text></View>
               }
               <View style={styles.slotBtnRow}>
-                <TouchableOpacity style={styles.slotBtn} onPress={() => pickFromLibrary(setter)}>
+                <TouchableOpacity style={styles.slotBtn} onPress={() => pickFromLibrary(setter, extractDate)}>
                   <ImageIcon size={14} color="#fff" />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.slotBtn} onPress={() => takePhoto(setter)}>
@@ -263,9 +274,10 @@ export default function HomeScreen() {
       {result && (
         <View style={styles.resultCard}>
           <Text style={styles.foodName}>{result.menu_name}</Text>
-          {analysisMode === 'before_after' && (
-            <Text style={styles.diffNote}>* 실제 섭취량 기준 계산</Text>
-          )}
+          <Text style={styles.diffNote}>
+            {photoDate ? `📅 ${photoDate} 기록 예정` : `📅 ${formatDate(new Date())} (오늘)`}
+            {analysisMode === 'before_after' ? '  •  실제 섭취량 기준' : ''}
+          </Text>
           <View style={styles.nutrientGrid}>
             <View style={styles.nutrientItem}><Text style={styles.nutrientVal}>{result.kcal}</Text><Text>kcal</Text></View>
             <View style={styles.nutrientItem}><Text style={styles.nutrientVal}>{result.carbs_g}g</Text><Text>탄수화물</Text></View>

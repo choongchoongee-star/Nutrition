@@ -80,6 +80,16 @@ async def get_goals():
         logger.error(f"get_goals error: {e}")
         return json_res(default)
 
+@app.delete("/api/v1/meals/{meal_id}")
+async def delete_meal(meal_id: int):
+    url = f"{SUPABASE_URL}/rest/v1/meals?id=eq.{meal_id}"
+    headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
+    resp = requests.delete(url, headers=headers)
+    if resp.status_code not in [200, 204]:
+        logger.error(f"Supabase delete failed [{resp.status_code}]: {resp.text}")
+        return json_res({"error": "삭제 실패", "msg": resp.text}, resp.status_code)
+    return json_res({"success": True})
+
 @app.post("/api/v1/analyze")
 async def analyze(image: UploadFile = File(...)):
     content = await image.read()

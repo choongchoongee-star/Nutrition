@@ -15,6 +15,16 @@ export const getImageMetadata = async (assetId) => {
   }
 };
 
+export const parseDateFromExif = (exif) => {
+  if (!exif) return null;
+  const raw = exif.DateTimeOriginal || exif.DateTime;
+  if (!raw) return null;
+  const datePart = raw.split(' ')[0];
+  const parts = datePart.split(':');
+  if (parts.length !== 3) return null;
+  return `${parts[0]}-${parts[1]}-${parts[2]}`;
+};
+
 export const suggestMealType = (hour) => {
   if (hour >= 5 && hour < 11) return "Breakfast";
   if (hour >= 11 && hour < 15) return "Lunch";
