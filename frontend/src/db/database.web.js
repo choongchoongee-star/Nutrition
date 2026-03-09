@@ -22,6 +22,7 @@ export const updateGoals = async (goals) => {
     await axios.post(`${API_BASE_URL}/goals`, goals);
   } catch (e) {
     console.error("Failed to update goals:", e);
+    throw e;
   }
 };
 

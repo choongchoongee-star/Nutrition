@@ -41,8 +41,9 @@ export default function SettingsScreen({ navigation }) {
 
     try {
       await updateGoals(formattedGoals);
-      Alert.alert("성공", "목표가 업데이트되었습니다!");
-      navigation.goBack();
+      Alert.alert("성공", "목표가 업데이트되었습니다!", [
+        { text: "확인", onPress: () => navigation.goBack() }
+      ]);
     } catch (error) {
       Alert.alert("오류", "목표 업데이트에 실패했습니다.");
     }
