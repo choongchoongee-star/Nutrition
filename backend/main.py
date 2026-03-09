@@ -80,6 +80,23 @@ async def get_goals():
         logger.error(f"get_goals error: {e}")
         return json_res(default)
 
+@app.post("/api/v1/goals")
+async def update_goals(request: Request):
+    body = await request.json()
+    url = f"{SUPABASE_URL}/rest/v1/goals?on_conflict=id"
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "resolution=merge-duplicates"
+    }
+    body_with_id = {"id": 1, **body}
+    resp = requests.post(url, headers=headers, json=body_with_id)
+    if resp.status_code not in [200, 201]:
+        logger.error(f"Supabase goals update failed [{resp.status_code}]: {resp.text}")
+        return json_res({"error": "목표 업데이트 실패", "msg": resp.text}, resp.status_code)
+    return json_res({"success": True})
+
 @app.delete("/api/v1/meals/{meal_id}")
 async def delete_meal(meal_id: int):
     url = f"{SUPABASE_URL}/rest/v1/meals?id=eq.{meal_id}"
