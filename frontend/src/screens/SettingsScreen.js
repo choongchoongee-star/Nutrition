@@ -45,7 +45,7 @@ export default function SettingsScreen({ navigation }) {
         { text: "확인", onPress: () => navigation.goBack() }
       ]);
     } catch (error) {
-      Alert.alert("오류", "목표 업데이트에 실패했습니다.");
+      Alert.alert("오류", `목표 업데이트에 실패했습니다.\n${error?.message || JSON.stringify(error)}`);
     }
   };
 
