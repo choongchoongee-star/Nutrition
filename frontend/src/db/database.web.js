@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // 백엔드 API 주소 (Vercel)
-const API_BASE_URL = "https://nutrition-choongchoongee-7456s-projects.vercel.app/api/v1";
+const API_BASE_URL = "https://backend-ochre-nine-38.vercel.app/api/v1";
 
 export const initDatabase = async () => {
   console.log("Cloud Database (Supabase via Vercel) initialized");
