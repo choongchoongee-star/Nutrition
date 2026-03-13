@@ -197,7 +197,7 @@ export default function HomeScreen() {
   const hasOddWarning = isBeforeAfter && imageCount % 2 !== 0;
   const analysisCount = isBeforeAfter ? pairCount : imageCount;
 
-  const allAnalyzed = images.length > 0 && images.every(i => i.result || i.error);
+  const allAnalyzed = images.length > 0 && images.every(i => i.result || i.error || i.paired);
   const hasResults = images.some(i => i.result);
   const canAnalyze = !loading && imageCount > 0 && !allAnalyzed && (isBeforeAfter ? pairCount > 0 : true);
 
