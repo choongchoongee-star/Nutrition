@@ -11,8 +11,8 @@ import { useFocusEffect } from '@react-navigation/native';
 const MODEL_ID = "gemini-2.5-flash";
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_ID}:generateContent`;
 
-const PROMPT_SINGLE = "Analyze this food image and return ONLY JSON: {\"menu_name\":str, \"kcal\":float, \"carbs_g\":float, \"protein_g\":float, \"fat_g\":float}";
-const PROMPT_BEFORE_AFTER = "Two food photos are provided: the FIRST image is BEFORE eating, the SECOND image is AFTER eating. Based on the visual difference (the amount of food consumed), estimate the nutritional content of ONLY the consumed portion. Return ONLY JSON: {\"menu_name\":str, \"kcal\":float, \"carbs_g\":float, \"protein_g\":float, \"fat_g\":float}";
+const PROMPT_SINGLE = "이 음식 사진을 분석하고 JSON만 반환하세요. menu_name은 반드시 한국어로 작성하세요: {\"menu_name\":str, \"kcal\":float, \"carbs_g\":float, \"protein_g\":float, \"fat_g\":float}";
+const PROMPT_BEFORE_AFTER = "두 장의 음식 사진이 제공됩니다. 첫 번째는 식사 전, 두 번째는 식사 후입니다. 실제 섭취한 양만 기준으로 영양 정보를 추정하세요. menu_name은 반드시 한국어로 작성하고 JSON만 반환하세요: {\"menu_name\":str, \"kcal\":float, \"carbs_g\":float, \"protein_g\":float, \"fat_g\":float}";
 
 const showAlert = (title, message) => {
   if (Platform.OS === 'web') {

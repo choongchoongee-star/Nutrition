@@ -124,7 +124,7 @@ async def analyze(image: UploadFile = File(...)):
     content = await image.read()
     base64_img = base64.b64encode(content).decode('utf-8')
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GOOGLE_API_KEY}"
-    prompt = "Return JSON: {'menu_name':str, 'weight_g':float, 'kcal':float, 'carbs_g':float, 'protein_g':float, 'fat_g':float}"
+    prompt = "이 음식 사진을 분석하고 JSON만 반환하세요. menu_name은 반드시 한국어로: {'menu_name':str, 'weight_g':float, 'kcal':float, 'carbs_g':float, 'protein_g':float, 'fat_g':float}"
     payload = {"contents": [{"parts": [{"text": prompt}, {"inline_data": {"mime_type": "image/jpeg", "data": base64_img}}]}], "generationConfig": {"temperature": 0.1}}
     resp = requests.post(url, json=payload)
     res_json = resp.json()
