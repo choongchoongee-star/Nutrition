@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { StyleSheet, Text, View, FlatList, Image, TouchableOpacity, Alert } from 'react-native';
+import { StyleSheet, Text, View, FlatList, Image, TouchableOpacity, Alert, Platform } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { getMealsByDate, deleteMeal } from '../db/database';
 import { formatDate } from '../utils/metadata';
@@ -21,18 +21,25 @@ export default function HistoryScreen() {
     }, [loadMeals])
   );
 
-  const handleDelete = (id) => {
-    Alert.alert(
-      "식단 삭제",
-      "이 식단 기록을 삭제하시겠습니까?",
-      [
-        { text: "취소", style: "cancel" },
-        { text: "삭제", style: "destructive", onPress: async () => {
-          await deleteMeal(id);
-          loadMeals();
-        }}
-      ]
-    );
+  const handleDelete = async (id) => {
+    if (Platform.OS === 'web') {
+      if (window.confirm("이 식단 기록을 삭제하시겠습니까?")) {
+        await deleteMeal(id);
+        loadMeals();
+      }
+    } else {
+      Alert.alert(
+        "식단 삭제",
+        "이 식단 기록을 삭제하시겠습니까?",
+        [
+          { text: "취소", style: "cancel" },
+          { text: "삭제", style: "destructive", onPress: async () => {
+            await deleteMeal(id);
+            loadMeals();
+          }}
+        ]
+      );
+    }
   };
 
   const translateMealType = (type) => {
