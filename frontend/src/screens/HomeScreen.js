@@ -60,6 +60,29 @@ export default function HomeScreen() {
   // --- Helpers ---
 
   const getBase64FromUri = async (uri) => {
+    if (Platform.OS === 'web') {
+      // Web: resize via canvas to reduce memory
+      return new Promise((resolve, reject) => {
+        const img = new window.Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          const MAX_DIM = 800;
+          let w = img.width, h = img.height;
+          if (w > MAX_DIM || h > MAX_DIM) {
+            const ratio = Math.min(MAX_DIM / w, MAX_DIM / h);
+            w = Math.round(w * ratio);
+            h = Math.round(h * ratio);
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.7).split(',')[1]);
+        };
+        img.onerror = reject;
+        img.src = uri;
+      });
+    }
     const response = await fetch(uri);
     const blob = await response.blob();
     return new Promise((resolve) => {
@@ -83,9 +106,32 @@ export default function HomeScreen() {
     };
   };
 
+  // --- Thumbnail resize (web only) ---
+
+  const resizeForThumbnail = (uri) => {
+    return new Promise((resolve, reject) => {
+      const img = new window.Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const MAX_DIM = 300;
+        let w = img.width, h = img.height;
+        const ratio = Math.min(MAX_DIM / w, MAX_DIM / h, 1);
+        w = Math.round(w * ratio);
+        h = Math.round(h * ratio);
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.6));
+      };
+      img.onerror = reject;
+      img.src = uri;
+    });
+  };
+
   // --- Image picking ---
 
-  const MAX_IMAGES = 10;
+  const MAX_IMAGES = analysisMode === 'before_after' ? 6 : 10;
 
   const pickImages = async () => {
     const currentCount = images.length;
@@ -97,14 +143,22 @@ export default function HomeScreen() {
       mediaTypes: ['images'],
       allowsMultipleSelection: true,
       selectionLimit: remaining,
-      quality: 0.5,
+      quality: 0.2,
       orderedSelection: true,
     });
     if (!res.canceled && res.assets.length > 0) {
       const existingUris = new Set(images.map(i => i.uri));
-      const newItems = res.assets
-        .filter(a => !existingUris.has(a.uri))
-        .map(a => ({ uri: a.uri, result: null, loading: false, error: null }));
+      const newAssets = res.assets.filter(a => !existingUris.has(a.uri));
+      // Web: create resized thumbnails to prevent memory crash
+      const newItems = await Promise.all(newAssets.map(async (a) => {
+        let thumbUri = a.uri;
+        if (Platform.OS === 'web') {
+          try {
+            thumbUri = await resizeForThumbnail(a.uri);
+          } catch (e) { /* fallback to original */ }
+        }
+        return { uri: a.uri, thumbUri, result: null, loading: false, error: null };
+      }));
       const merged = [...images, ...newItems].slice(0, MAX_IMAGES);
       setImages(merged);
       setErrorLog(null);
@@ -123,7 +177,7 @@ export default function HomeScreen() {
     if (!permission.granted) return showAlert("알림", "카메라 접근 권한이 필요합니다.");
     const res = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.5 });
     if (!res.canceled) {
-      const newItem = { uri: res.assets[0].uri, result: null, loading: false, error: null };
+      const newItem = { uri: res.assets[0].uri, thumbUri: res.assets[0].uri, result: null, loading: false, error: null };
       setImages([...images, newItem].slice(0, MAX_IMAGES));
       setErrorLog(null);
     }
@@ -289,7 +343,7 @@ export default function HomeScreen() {
       ) : imageCount === 1 && !isBeforeAfter ? (
         // Single image: large view
         <View style={{ position: 'relative', marginBottom: 15 }}>
-          <Image source={{ uri: images[0].uri }} style={styles.image} />
+          <Image source={{ uri: images[0].thumbUri || images[0].uri }} style={styles.image} />
           {images[0].loading && <ActivityIndicator style={styles.singleOverlay} size="large" color="#007bff" />}
           {images[0].result && (
             <View style={styles.singleResultOverlay}>
@@ -315,14 +369,14 @@ export default function HomeScreen() {
                 <View style={styles.beforeAfterRow}>
                   <View style={styles.slot}>
                     <Text style={styles.slotLabel}>전</Text>
-                    <Image source={{ uri: beforeItem.uri }} style={styles.slotImage} />
+                    <Image source={{ uri: beforeItem.thumbUri || beforeItem.uri }} style={styles.slotImage} />
                     {beforeItem.loading && <ActivityIndicator style={styles.slotOverlay} color="#007bff" />}
                   </View>
                   <View style={styles.slot}>
                     <Text style={styles.slotLabel}>후</Text>
                     {afterItem ? (
                       <>
-                        <Image source={{ uri: afterItem.uri }} style={styles.slotImage} />
+                        <Image source={{ uri: afterItem.thumbUri || afterItem.uri }} style={styles.slotImage} />
                         {afterItem.loading && <ActivityIndicator style={styles.slotOverlay} color="#007bff" />}
                       </>
                     ) : (
@@ -350,7 +404,7 @@ export default function HomeScreen() {
         <View style={styles.multiGrid}>
           {images.map((item, idx) => (
             <View key={idx} style={styles.multiItem}>
-              <Image source={{ uri: item.uri }} style={styles.multiImage} />
+              <Image source={{ uri: item.thumbUri || item.uri }} style={styles.multiImage} />
               {item.loading && <ActivityIndicator style={styles.multiOverlay} color="#007bff" />}
               {item.result && (
                 <View style={styles.multiResultBadge}>
