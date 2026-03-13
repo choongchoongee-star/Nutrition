@@ -38,13 +38,24 @@ async def health():
     return json_res({"status": "ok", "version": "3.9 (POST goals)"})
 
 @app.get("/api/v1/meals")
-async def get_meals(date: str):
-    url = f"{SUPABASE_URL}/rest/v1/meals?date=eq.{date}&select=*"
+async def get_meals(date: str = None, page: int = 1, limit: int = 20):
     headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
-    resp = requests.get(url, headers=headers)
-    if resp.status_code != 200:
-        return json_res({"error": "조회 실패", "msg": resp.text}, resp.status_code)
-    return json_res(resp.json())
+    if date:
+        url = f"{SUPABASE_URL}/rest/v1/meals?date=eq.{date}&select=*"
+        resp = requests.get(url, headers=headers)
+        if resp.status_code != 200:
+            return json_res({"error": "조회 실패", "msg": resp.text}, resp.status_code)
+        return json_res(resp.json())
+    else:
+        offset = (page - 1) * limit
+        count_headers = {**headers, "Prefer": "count=exact"}
+        count_resp = requests.get(f"{SUPABASE_URL}/rest/v1/meals?select=id", headers=count_headers)
+        total = int(count_resp.headers.get("content-range", "0/0").split("/")[-1] or 0)
+        url = f"{SUPABASE_URL}/rest/v1/meals?select=*&order=date.desc,id.desc&offset={offset}&limit={limit}"
+        resp = requests.get(url, headers=headers)
+        if resp.status_code != 200:
+            return json_res({"error": "조회 실패", "msg": resp.text}, resp.status_code)
+        return json_res({"meals": resp.json(), "total": total, "page": page, "limit": limit})
 
 @app.post("/api/v1/meals")
 async def add_meal(request: Request):

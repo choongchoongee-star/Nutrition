@@ -91,3 +91,19 @@ export const deleteMeal = async (id) => {
     console.error("Failed to delete meal:", error);
   }
 };
+
+export const getAllMeals = async (page = 1, limit = 20) => {
+  try {
+    const offset = (page - 1) * limit;
+    const countResult = await db.getFirstAsync(`SELECT COUNT(*) as total FROM meals`);
+    const total = countResult.total;
+    const rows = await db.getAllAsync(
+      `SELECT * FROM meals ORDER BY date DESC, id DESC LIMIT ? OFFSET ?`,
+      [limit, offset]
+    );
+    return { meals: rows, total, page, limit };
+  } catch (error) {
+    console.error("Failed to get all meals:", error);
+    return { meals: [], total: 0, page: 1, limit: 20 };
+  }
+};

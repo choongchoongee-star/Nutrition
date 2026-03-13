@@ -53,3 +53,13 @@ export const deleteMeal = async (id) => {
     console.error("Failed to delete meal:", e);
   }
 };
+
+export const getAllMeals = async (page = 1, limit = 20) => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}/meals?page=${page}&limit=${limit}`);
+    return response.data;
+  } catch (e) {
+    console.error("Failed to fetch all meals:", e);
+    return { meals: [], total: 0, page: 1, limit: 20 };
+  }
+};

@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, ScrollView, Alert, Platform } from 'react-native';
 import { getGoals, updateGoals } from '../db/database';
 import { Save } from 'lucide-react-native';
 
+const calcKcal = (carbs, protein, fat) => {
+  const c = parseFloat(carbs) || 0;
+  const p = parseFloat(protein) || 0;
+  const f = parseFloat(fat) || 0;
+  return Math.round(c * 4 + p * 4 + f * 9);
+};
+
 export default function SettingsScreen({ navigation }) {
   const [goals, setGoals] = useState({
-    target_kcal: '2000',
     target_carbs: '250',
     target_protein: '60',
     target_fat: '50'
@@ -16,7 +22,6 @@ export default function SettingsScreen({ navigation }) {
       const data = await getGoals();
       if (data) {
         setGoals({
-          target_kcal: data.target_kcal.toString(),
           target_carbs: data.target_carbs.toString(),
           target_protein: data.target_protein.toString(),
           target_fat: data.target_fat.toString()
@@ -26,26 +31,44 @@ export default function SettingsScreen({ navigation }) {
     loadGoals();
   }, []);
 
+  const autoKcal = calcKcal(goals.target_carbs, goals.target_protein, goals.target_fat);
+
   const handleSave = async () => {
     const formattedGoals = {
-      target_kcal: parseFloat(goals.target_kcal),
+      target_kcal: autoKcal,
       target_carbs: parseFloat(goals.target_carbs),
       target_protein: parseFloat(goals.target_protein),
       target_fat: parseFloat(goals.target_fat)
     };
 
-    if (Object.values(formattedGoals).some(isNaN)) {
-      Alert.alert("오류", "모든 목표 수치에 올바른 숫자를 입력해주세요.");
+    if ([formattedGoals.target_carbs, formattedGoals.target_protein, formattedGoals.target_fat].some(isNaN)) {
+      if (Platform.OS === 'web') {
+        window.alert("모든 목표 수치에 올바른 숫자를 입력해주세요.");
+      } else {
+        Alert.alert("오류", "모든 목표 수치에 올바른 숫자를 입력해주세요.");
+      }
       return;
     }
 
     try {
       await updateGoals(formattedGoals);
-      Alert.alert("성공", "목표가 업데이트되었습니다!");
+      if (Platform.OS === 'web') {
+        window.alert("목표가 업데이트되었습니다!");
+      } else {
+        Alert.alert("성공", "목표가 업데이트되었습니다!");
+      }
       navigation.goBack();
     } catch (error) {
-      Alert.alert("오류", "목표 업데이트에 실패했습니다.");
+      if (Platform.OS === 'web') {
+        window.alert("목표 업데이트에 실패했습니다.");
+      } else {
+        Alert.alert("오류", "목표 업데이트에 실패했습니다.");
+      }
     }
+  };
+
+  const handleChange = (key, text) => {
+    setGoals({ ...goals, [key]: text });
   };
 
   const renderInput = (label, key, unit) => (
@@ -54,7 +77,7 @@ export default function SettingsScreen({ navigation }) {
       <TextInput
         style={styles.input}
         value={goals[key]}
-        onChangeText={(text) => setGoals({ ...goals, [key]: text })}
+        onChangeText={(text) => handleChange(key, text)}
         keyboardType="numeric"
         placeholder={`${label} 입력`}
       />
@@ -63,13 +86,18 @@ export default function SettingsScreen({ navigation }) {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>일일 목표 설정 🎯</Text>
-      <Text style={styles.subtitle}>매일 섭취할 영양소 목표를 설정하여 진행 상황을 추적하세요.</Text>
-      
-      {renderInput("칼로리", "target_kcal", "kcal")}
+      <Text style={styles.title}>일일 목표 설정</Text>
+      <Text style={styles.subtitle}>탄수화물, 단백질, 지방을 입력하면 칼로리가 자동 계산됩니다.</Text>
+
       {renderInput("탄수화물", "target_carbs", "g")}
       {renderInput("단백질", "target_protein", "g")}
       {renderInput("지방", "target_fat", "g")}
+
+      <View style={styles.kcalCard}>
+        <Text style={styles.kcalLabel}>목표 칼로리 (자동 계산)</Text>
+        <Text style={styles.kcalValue}>{autoKcal} kcal</Text>
+        <Text style={styles.kcalFormula}>탄수화물x4 + 단백질x4 + 지방x9</Text>
+      </View>
 
       <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
         <Save size={20} color="#fff" />
@@ -91,7 +119,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#666',
     marginBottom: 30,
   },
@@ -111,6 +139,30 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     backgroundColor: '#f9f9f9',
+  },
+  kcalCard: {
+    backgroundColor: '#f0f7ff',
+    borderRadius: 14,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#d0e3ff',
+  },
+  kcalLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 6,
+  },
+  kcalValue: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#007bff',
+  },
+  kcalFormula: {
+    fontSize: 11,
+    color: '#999',
+    marginTop: 4,
   },
   saveButton: {
     backgroundColor: '#007bff',
