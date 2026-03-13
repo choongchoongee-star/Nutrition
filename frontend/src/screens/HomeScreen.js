@@ -85,29 +85,46 @@ export default function HomeScreen() {
 
   // --- Image picking ---
 
+  const MAX_IMAGES = 10;
+
   const pickImages = async () => {
+    const currentCount = images.length;
+    const remaining = MAX_IMAGES - currentCount;
+    if (remaining <= 0) {
+      return showAlert("알림", `최대 ${MAX_IMAGES}장까지만 등록할 수 있습니다.`);
+    }
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsMultipleSelection: true,
+      selectionLimit: remaining,
       quality: 0.5,
       orderedSelection: true,
     });
     if (!res.canceled && res.assets.length > 0) {
-      const items = res.assets.map(a => ({ uri: a.uri, result: null, loading: false, error: null }));
-      setImages(items);
+      const existingUris = new Set(images.map(i => i.uri));
+      const newItems = res.assets
+        .filter(a => !existingUris.has(a.uri))
+        .map(a => ({ uri: a.uri, result: null, loading: false, error: null }));
+      const merged = [...images, ...newItems].slice(0, MAX_IMAGES);
+      setImages(merged);
       setErrorLog(null);
-      // Extract date from first photo
-      const date = await extractDateFromUri(res.assets[0].uri, res.assets[0].exif);
-      setPhotoDate(date);
+      if (images.length === 0 && merged.length > 0) {
+        const date = await extractDateFromUri(res.assets[0].uri, res.assets[0].exif);
+        setPhotoDate(date);
+      }
     }
   };
 
   const takePhoto = async () => {
+    if (images.length >= MAX_IMAGES) {
+      return showAlert("알림", `최대 ${MAX_IMAGES}장까지만 등록할 수 있습니다.`);
+    }
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) return showAlert("알림", "카메라 접근 권한이 필요합니다.");
     const res = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.5 });
     if (!res.canceled) {
-      setImages([{ uri: res.assets[0].uri, result: null, loading: false, error: null }]);
+      const newItem = { uri: res.assets[0].uri, result: null, loading: false, error: null };
+      setImages([...images, newItem].slice(0, MAX_IMAGES));
       setErrorLog(null);
     }
   };
@@ -362,7 +379,8 @@ export default function HomeScreen() {
       {/* 버튼 */}
       <View style={styles.buttonRow}>
         <TouchableOpacity style={styles.iconBtn} onPress={pickImages}>
-          <ImageIcon size={20} color="#fff" /><Text style={styles.btnText}>갤러리</Text>
+          <ImageIcon size={20} color="#fff" />
+          <Text style={styles.btnText}>{imageCount > 0 ? `추가 (${imageCount}/${MAX_IMAGES})` : '갤러리'}</Text>
         </TouchableOpacity>
         {!isBeforeAfter && (
           <TouchableOpacity style={styles.iconBtn} onPress={takePhoto}>
