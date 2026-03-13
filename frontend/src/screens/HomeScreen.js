@@ -4,7 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import axios from 'axios';
 import { suggestMealType, formatDate, extractDateFromUri } from '../utils/metadata';
 import { saveMeal, getMealsByDate, getGoals } from '../db/database';
-import { Camera, Image as ImageIcon, Save, Plus, X } from 'lucide-react-native';
+import { Camera, Image as ImageIcon, Save, X } from 'lucide-react-native';
 import ProgressBar from '../components/ProgressBar';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -23,22 +23,14 @@ const showAlert = (title, message) => {
 };
 
 export default function HomeScreen() {
-  const [analysisMode, setAnalysisMode] = useState('single'); // 'single' | 'multi' | 'before_after'
+  // 2 modes only: 'normal' | 'before_after'
+  const [analysisMode, setAnalysisMode] = useState('normal');
 
-  // Single mode
-  const [image, setImage] = useState(null);
-
-  // Multi mode
-  const [multiImages, setMultiImages] = useState([]); // [{uri, result, loading}]
-
-  // Before/after mode
-  const [beforeImage, setBeforeImage] = useState(null);
-  const [afterImage, setAfterImage] = useState(null);
+  // Unified image list: [{uri, result, loading, error}]
+  const [images, setImages] = useState([]);
 
   const [photoDate, setPhotoDate] = useState(null);
-
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
   const [errorLog, setErrorLog] = useState(null);
 
   const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_API_KEY || "";
@@ -77,65 +69,6 @@ export default function HomeScreen() {
     });
   };
 
-  const pickFromLibrary = async (setter, extractDate = false) => {
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.5, exif: true });
-    if (!res.canceled) {
-      const asset = res.assets[0];
-      setter(asset.uri);
-      setResult(null);
-      setErrorLog(null);
-      if (extractDate) {
-        const date = await extractDateFromUri(asset.uri, asset.exif);
-        setPhotoDate(date);
-      }
-    }
-  };
-
-  const pickMultiImages = async () => {
-    const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsMultipleSelection: true,
-      quality: 0.5,
-    });
-    if (!res.canceled && res.assets.length > 0) {
-      const items = res.assets.map(a => ({ uri: a.uri, result: null, loading: false, error: null }));
-      setMultiImages(items);
-      setErrorLog(null);
-    }
-  };
-
-  const pickBeforeAfterPair = async () => {
-    const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsMultipleSelection: true,
-      selectionLimit: 2,
-      quality: 0.5,
-      orderedSelection: true,
-    });
-    if (!res.canceled && res.assets.length >= 2) {
-      setBeforeImage(res.assets[0].uri);
-      setAfterImage(res.assets[1].uri);
-      setResult(null);
-      setErrorLog(null);
-      const date = await extractDateFromUri(res.assets[0].uri, res.assets[0].exif);
-      setPhotoDate(date);
-    } else if (!res.canceled && res.assets.length === 1) {
-      setBeforeImage(res.assets[0].uri);
-      setAfterImage(null);
-      setResult(null);
-      setErrorLog(null);
-      const date = await extractDateFromUri(res.assets[0].uri, res.assets[0].exif);
-      setPhotoDate(date);
-    }
-  };
-
-  const takePhoto = async (setter) => {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) return showAlert("알림", "카메라 접근 권한이 필요합니다.");
-    const res = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.5 });
-    if (!res.canceled) { setter(res.assets[0].uri); setResult(null); setErrorLog(null); }
-  };
-
   const parseJsonResult = (apiResponse) => {
     const rawText = apiResponse.data.candidates[0].content.parts[0].text;
     const start = rawText.indexOf('{');
@@ -150,119 +83,123 @@ export default function HomeScreen() {
     };
   };
 
+  // --- Image picking ---
+
+  const pickImages = async () => {
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      quality: 0.5,
+      orderedSelection: true,
+    });
+    if (!res.canceled && res.assets.length > 0) {
+      const items = res.assets.map(a => ({ uri: a.uri, result: null, loading: false, error: null }));
+      setImages(items);
+      setErrorLog(null);
+      // Extract date from first photo
+      const date = await extractDateFromUri(res.assets[0].uri, res.assets[0].exif);
+      setPhotoDate(date);
+    }
+  };
+
+  const takePhoto = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) return showAlert("알림", "카메라 접근 권한이 필요합니다.");
+    const res = await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.5 });
+    if (!res.canceled) {
+      setImages([{ uri: res.assets[0].uri, result: null, loading: false, error: null }]);
+      setErrorLog(null);
+    }
+  };
+
+  const removeImage = (idx) => {
+    setImages(images.filter((_, i) => i !== idx));
+  };
+
+  // --- Derived state ---
+
+  const imageCount = images.length;
+  const isBeforeAfter = analysisMode === 'before_after';
+
+  // before_after: must be even number of images, paired as (1&2), (3&4)...
+  const pairCount = isBeforeAfter ? Math.floor(imageCount / 2) : 0;
+  const hasOddWarning = isBeforeAfter && imageCount % 2 !== 0;
+  const analysisCount = isBeforeAfter ? pairCount : imageCount;
+
+  const allAnalyzed = images.length > 0 && images.every(i => i.result || i.error);
+  const hasResults = images.some(i => i.result);
+  const canAnalyze = !loading && imageCount > 0 && !allAnalyzed && (isBeforeAfter ? pairCount > 0 : true);
+
   // --- Analysis ---
 
-  const analyzeSingle = async () => {
-    setErrorLog(null);
-    if (!GOOGLE_API_KEY) return setErrorLog("API 키가 설정되지 않았습니다.");
-    setLoading(true);
-    try {
-      const base64 = await getBase64FromUri(image);
-      const res = await axios.post(`${GEMINI_API_URL}?key=${GOOGLE_API_KEY}`, {
-        contents: [{ parts: [
-          { text: PROMPT_SINGLE },
-          { inline_data: { mime_type: "image/jpeg", data: base64 } },
-        ]}],
-        generationConfig: { temperature: 0.1 },
-      });
-      setResult(parseJsonResult(res));
-    } catch (error) {
-      setErrorLog(`분석 중 오류: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const analyzeBeforeAfter = async () => {
-    setErrorLog(null);
-    if (!GOOGLE_API_KEY) return setErrorLog("API 키가 설정되지 않았습니다.");
-    setLoading(true);
-    try {
-      const [beforeBase64, afterBase64] = await Promise.all([
-        getBase64FromUri(beforeImage),
-        getBase64FromUri(afterImage),
-      ]);
-      const res = await axios.post(`${GEMINI_API_URL}?key=${GOOGLE_API_KEY}`, {
-        contents: [{ parts: [
-          { text: PROMPT_BEFORE_AFTER },
-          { inline_data: { mime_type: "image/jpeg", data: beforeBase64 } },
-          { inline_data: { mime_type: "image/jpeg", data: afterBase64 } },
-        ]}],
-        generationConfig: { temperature: 0.1 },
-      });
-      setResult(parseJsonResult(res));
-    } catch (error) {
-      setErrorLog(`분석 중 오류: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const analyzeMulti = async () => {
+  const analyzeFood = async () => {
     setErrorLog(null);
     if (!GOOGLE_API_KEY) return setErrorLog("API 키가 설정되지 않았습니다.");
     setLoading(true);
 
-    const updated = [...multiImages];
-    for (let i = 0; i < updated.length; i++) {
-      updated[i] = { ...updated[i], loading: true };
-      setMultiImages([...updated]);
-      try {
-        const base64 = await getBase64FromUri(updated[i].uri);
-        const res = await axios.post(`${GEMINI_API_URL}?key=${GOOGLE_API_KEY}`, {
-          contents: [{ parts: [
-            { text: PROMPT_SINGLE },
-            { inline_data: { mime_type: "image/jpeg", data: base64 } },
-          ]}],
-          generationConfig: { temperature: 0.1 },
-        });
-        updated[i] = { ...updated[i], result: parseJsonResult(res), loading: false };
-      } catch (error) {
-        updated[i] = { ...updated[i], error: error.message, loading: false };
+    const updated = [...images];
+
+    if (isBeforeAfter) {
+      // Pair analysis: (0,1), (2,3), (4,5)...
+      for (let i = 0; i + 1 < updated.length; i += 2) {
+        updated[i] = { ...updated[i], loading: true };
+        updated[i + 1] = { ...updated[i + 1], loading: true };
+        setImages([...updated]);
+        try {
+          const [beforeBase64, afterBase64] = await Promise.all([
+            getBase64FromUri(updated[i].uri),
+            getBase64FromUri(updated[i + 1].uri),
+          ]);
+          const res = await axios.post(`${GEMINI_API_URL}?key=${GOOGLE_API_KEY}`, {
+            contents: [{ parts: [
+              { text: PROMPT_BEFORE_AFTER },
+              { inline_data: { mime_type: "image/jpeg", data: beforeBase64 } },
+              { inline_data: { mime_type: "image/jpeg", data: afterBase64 } },
+            ]}],
+            generationConfig: { temperature: 0.1 },
+          });
+          const result = parseJsonResult(res);
+          // Result goes on the "before" image, "after" gets a reference
+          updated[i] = { ...updated[i], result, loading: false };
+          updated[i + 1] = { ...updated[i + 1], result: null, loading: false, paired: true };
+        } catch (error) {
+          updated[i] = { ...updated[i], error: error.message, loading: false };
+          updated[i + 1] = { ...updated[i + 1], error: error.message, loading: false };
+        }
+        setImages([...updated]);
       }
-      setMultiImages([...updated]);
+    } else {
+      // Normal: each image analyzed individually
+      for (let i = 0; i < updated.length; i++) {
+        updated[i] = { ...updated[i], loading: true };
+        setImages([...updated]);
+        try {
+          const base64 = await getBase64FromUri(updated[i].uri);
+          const res = await axios.post(`${GEMINI_API_URL}?key=${GOOGLE_API_KEY}`, {
+            contents: [{ parts: [
+              { text: PROMPT_SINGLE },
+              { inline_data: { mime_type: "image/jpeg", data: base64 } },
+            ]}],
+            generationConfig: { temperature: 0.1 },
+          });
+          updated[i] = { ...updated[i], result: parseJsonResult(res), loading: false };
+        } catch (error) {
+          updated[i] = { ...updated[i], error: error.message, loading: false };
+        }
+        setImages([...updated]);
+      }
     }
     setLoading(false);
   };
 
-  const analyzeFood = () => {
-    if (analysisMode === 'single') analyzeSingle();
-    else if (analysisMode === 'before_after') analyzeBeforeAfter();
-    else if (analysisMode === 'multi') analyzeMulti();
-  };
-
   // --- Save ---
 
-  const handleSave = async () => {
-    if (!result) return;
-    setLoading(true);
-    try {
-      const mealDate = photoDate || formatDate(new Date());
-      await saveMeal({
-        date: mealDate,
-        meal_type: suggestMealType(new Date().getHours()),
-        menu_name: result.menu_name,
-        kcal: result.kcal,
-        carbs_g: result.carbs_g,
-        protein_g: result.protein_g,
-        fat_g: result.fat_g,
-      });
-      showAlert("성공", "식단이 기록되었습니다!");
-      setResult(null); setImage(null); setBeforeImage(null); setAfterImage(null);
-      loadDailyProgress();
-    } catch (error) {
-      showAlert("실패", error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSaveMulti = async () => {
-    const toSave = multiImages.filter(item => item.result);
+  const handleSaveAll = async () => {
+    const toSave = images.filter(item => item.result);
     if (toSave.length === 0) return;
     setLoading(true);
     try {
-      const mealDate = formatDate(new Date());
+      const mealDate = photoDate || formatDate(new Date());
       for (const item of toSave) {
         await saveMeal({
           date: mealDate,
@@ -275,7 +212,7 @@ export default function HomeScreen() {
         });
       }
       showAlert("성공", `${toSave.length}개 식단이 기록되었습니다!`);
-      setMultiImages([]);
+      setImages([]);
       loadDailyProgress();
     } catch (error) {
       showAlert("실패", error.message);
@@ -288,19 +225,10 @@ export default function HomeScreen() {
 
   const switchMode = (mode) => {
     setAnalysisMode(mode);
-    setResult(null); setErrorLog(null);
-    setImage(null); setBeforeImage(null); setAfterImage(null); setPhotoDate(null);
-    setMultiImages([]);
+    setImages([]);
+    setErrorLog(null);
+    setPhotoDate(null);
   };
-
-  const canAnalyze = !loading && (
-    analysisMode === 'single' ? (!!image && !result) :
-    analysisMode === 'before_after' ? (!!beforeImage && !!afterImage && !result) :
-    analysisMode === 'multi' ? (multiImages.length > 0 && multiImages.every(i => !i.result && !i.loading)) :
-    false
-  );
-
-  const multiHasResults = multiImages.some(i => i.result);
 
   // --- Render ---
 
@@ -318,116 +246,139 @@ export default function HomeScreen() {
 
       {/* 모드 토글 */}
       <View style={styles.modeToggle}>
-        {[
-          { key: 'single', label: '단일' },
-          { key: 'multi', label: '여러 장' },
-          { key: 'before_after', label: '전후 비교' },
-        ].map(({ key, label }) => (
-          <TouchableOpacity
-            key={key}
-            style={[styles.modeBtn, analysisMode === key && styles.modeBtnActive]}
-            onPress={() => switchMode(key)}
-          >
-            <Text style={[styles.modeBtnText, analysisMode === key && styles.modeBtnTextActive]}>{label}</Text>
-          </TouchableOpacity>
-        ))}
+        <TouchableOpacity
+          style={[styles.modeBtn, analysisMode === 'normal' && styles.modeBtnActive]}
+          onPress={() => switchMode('normal')}
+        >
+          <Text style={[styles.modeBtnText, analysisMode === 'normal' && styles.modeBtnTextActive]}>일반</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.modeBtn, analysisMode === 'before_after' && styles.modeBtnActive]}
+          onPress={() => switchMode('before_after')}
+        >
+          <Text style={[styles.modeBtnText, analysisMode === 'before_after' && styles.modeBtnTextActive]}>전후 비교</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* 단일 사진 모드 */}
-      {analysisMode === 'single' && (
-        <>
-          {image
-            ? <Image source={{ uri: image }} style={styles.image} />
-            : <View style={styles.placeholder}><Text style={styles.placeholderText}>음식 사진을 선택해주세요</Text></View>
-          }
-          <View style={styles.buttonRow}>
-            <TouchableOpacity style={styles.iconBtn} onPress={() => pickFromLibrary(setImage, true)}>
-              <ImageIcon size={20} color="#fff" /><Text style={styles.btnText}>갤러리</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.iconBtn} onPress={() => takePhoto(setImage)}>
-              <Camera size={20} color="#fff" /><Text style={styles.btnText}>카메라</Text>
-            </TouchableOpacity>
-          </View>
-        </>
-      )}
-
-      {/* 여러 장 모드 */}
-      {analysisMode === 'multi' && (
-        <>
-          {multiImages.length === 0 ? (
-            <View style={styles.placeholder}>
-              <Text style={styles.placeholderText}>여러 장의 음식 사진을 선택해주세요</Text>
-            </View>
-          ) : (
-            <View style={styles.multiGrid}>
-              {multiImages.map((item, idx) => (
-                <View key={idx} style={styles.multiItem}>
-                  <Image source={{ uri: item.uri }} style={styles.multiImage} />
-                  {item.loading && <ActivityIndicator style={styles.multiOverlay} color="#007bff" />}
-                  {item.result && (
-                    <View style={styles.multiResultBadge}>
-                      <Text style={styles.multiResultText}>{item.result.menu_name}</Text>
-                      <Text style={styles.multiResultKcal}>{item.result.kcal} kcal</Text>
-                    </View>
-                  )}
-                  {item.error && (
-                    <View style={[styles.multiResultBadge, { backgroundColor: '#fff0f0' }]}>
-                      <Text style={{ fontSize: 10, color: '#d32f2f' }}>오류</Text>
-                    </View>
-                  )}
-                  <TouchableOpacity
-                    style={styles.multiRemoveBtn}
-                    onPress={() => setMultiImages(multiImages.filter((_, i) => i !== idx))}
-                  >
-                    <X size={14} color="#fff" />
-                  </TouchableOpacity>
-                </View>
-              ))}
+      {/* 사진 영역 */}
+      {imageCount === 0 ? (
+        <View style={styles.placeholder}>
+          <Text style={styles.placeholderText}>
+            {isBeforeAfter
+              ? '전후 사진을 짝수로 선택해주세요\n(1번째=전, 2번째=후, 3번째=전, ...)'
+              : '음식 사진을 선택해주세요'}
+          </Text>
+        </View>
+      ) : imageCount === 1 && !isBeforeAfter ? (
+        // Single image: large view
+        <View style={{ position: 'relative', marginBottom: 15 }}>
+          <Image source={{ uri: images[0].uri }} style={styles.image} />
+          {images[0].loading && <ActivityIndicator style={styles.singleOverlay} size="large" color="#007bff" />}
+          {images[0].result && (
+            <View style={styles.singleResultOverlay}>
+              <Text style={styles.singleResultName}>{images[0].result.menu_name}</Text>
+              <Text style={styles.singleResultKcal}>{images[0].result.kcal} kcal</Text>
             </View>
           )}
-          <View style={styles.buttonRow}>
-            <TouchableOpacity style={styles.iconBtn} onPress={pickMultiImages}>
-              <Plus size={20} color="#fff" /><Text style={styles.btnText}>사진 선택</Text>
-            </TouchableOpacity>
-          </View>
-        </>
+          <TouchableOpacity style={styles.singleRemoveBtn} onPress={() => setImages([])}>
+            <X size={16} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      ) : isBeforeAfter ? (
+        // Before/after: show pairs
+        <View style={{ marginBottom: 15 }}>
+          {Array.from({ length: Math.ceil(imageCount / 2) }).map((_, pairIdx) => {
+            const beforeIdx = pairIdx * 2;
+            const afterIdx = pairIdx * 2 + 1;
+            const beforeItem = images[beforeIdx];
+            const afterItem = afterIdx < imageCount ? images[afterIdx] : null;
+            return (
+              <View key={pairIdx} style={{ marginBottom: 12 }}>
+                {analysisCount > 1 && <Text style={styles.pairLabel}>식사 {pairIdx + 1}</Text>}
+                <View style={styles.beforeAfterRow}>
+                  <View style={styles.slot}>
+                    <Text style={styles.slotLabel}>전</Text>
+                    <Image source={{ uri: beforeItem.uri }} style={styles.slotImage} />
+                    {beforeItem.loading && <ActivityIndicator style={styles.slotOverlay} color="#007bff" />}
+                  </View>
+                  <View style={styles.slot}>
+                    <Text style={styles.slotLabel}>후</Text>
+                    {afterItem ? (
+                      <>
+                        <Image source={{ uri: afterItem.uri }} style={styles.slotImage} />
+                        {afterItem.loading && <ActivityIndicator style={styles.slotOverlay} color="#007bff" />}
+                      </>
+                    ) : (
+                      <View style={styles.slotPlaceholder}><Text style={styles.placeholderText}>사진 없음</Text></View>
+                    )}
+                  </View>
+                </View>
+                {beforeItem.result && (
+                  <View style={styles.pairResult}>
+                    <Text style={styles.pairResultName}>{beforeItem.result.menu_name}</Text>
+                    <Text style={styles.pairResultInfo}>
+                      {beforeItem.result.kcal} kcal | 탄:{beforeItem.result.carbs_g}g 단:{beforeItem.result.protein_g}g 지:{beforeItem.result.fat_g}g
+                    </Text>
+                  </View>
+                )}
+                {beforeItem.error && (
+                  <Text style={styles.pairError}>분석 실패: {beforeItem.error}</Text>
+                )}
+              </View>
+            );
+          })}
+        </View>
+      ) : (
+        // Normal multi: grid view
+        <View style={styles.multiGrid}>
+          {images.map((item, idx) => (
+            <View key={idx} style={styles.multiItem}>
+              <Image source={{ uri: item.uri }} style={styles.multiImage} />
+              {item.loading && <ActivityIndicator style={styles.multiOverlay} color="#007bff" />}
+              {item.result && (
+                <View style={styles.multiResultBadge}>
+                  <Text style={styles.multiResultText}>{item.result.menu_name}</Text>
+                  <Text style={styles.multiResultKcal}>{item.result.kcal} kcal</Text>
+                </View>
+              )}
+              {item.error && (
+                <View style={[styles.multiResultBadge, { backgroundColor: '#fff0f0' }]}>
+                  <Text style={{ fontSize: 10, color: '#d32f2f' }}>오류</Text>
+                </View>
+              )}
+              <TouchableOpacity style={styles.multiRemoveBtn} onPress={() => removeImage(idx)}>
+                <X size={14} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
       )}
 
-      {/* 전후 비교 모드 */}
-      {analysisMode === 'before_after' && (
-        <>
-          <View style={styles.beforeAfterRow}>
-            {[
-              { label: '식사 전', uri: beforeImage },
-              { label: '식사 후', uri: afterImage },
-            ].map(({ label, uri }) => (
-              <View key={label} style={styles.slot}>
-                <Text style={styles.slotLabel}>{label}</Text>
-                {uri
-                  ? <Image source={{ uri }} style={styles.slotImage} />
-                  : <View style={styles.slotPlaceholder}><Text style={styles.placeholderText}>사진 없음</Text></View>
-                }
-              </View>
-            ))}
-          </View>
-          <View style={styles.buttonRow}>
-            <TouchableOpacity style={styles.iconBtn} onPress={pickBeforeAfterPair}>
-              <ImageIcon size={20} color="#fff" /><Text style={styles.btnText}>전후 사진 선택</Text>
-            </TouchableOpacity>
-          </View>
-        </>
+      {/* 경고: 홀수 사진 */}
+      {hasOddWarning && (
+        <Text style={styles.oddWarning}>전후 비교는 짝수 장이 필요합니다. 마지막 1장은 분석에서 제외됩니다.</Text>
       )}
+
+      {/* 버튼 */}
+      <View style={styles.buttonRow}>
+        <TouchableOpacity style={styles.iconBtn} onPress={pickImages}>
+          <ImageIcon size={20} color="#fff" /><Text style={styles.btnText}>갤러리</Text>
+        </TouchableOpacity>
+        {!isBeforeAfter && (
+          <TouchableOpacity style={styles.iconBtn} onPress={takePhoto}>
+            <Camera size={20} color="#fff" /><Text style={styles.btnText}>카메라</Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       {/* 분석 버튼 */}
       {canAnalyze && (
         <TouchableOpacity style={styles.analyzeBtn} onPress={analyzeFood}>
           <Text style={styles.btnText}>
-            {analysisMode === 'multi' ? `AI 분석 시작 (${multiImages.length}장)` : 'AI 분석 시작'}
+            AI 분석 시작 ({analysisCount}건)
           </Text>
         </TouchableOpacity>
       )}
-
-      {loading && analysisMode !== 'multi' && <ActivityIndicator size="large" color="#007bff" style={{ marginTop: 20 }} />}
 
       {errorLog && (
         <View style={styles.errorBox}>
@@ -439,39 +390,34 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* 단일/전후 분석 결과 */}
-      {result && (analysisMode === 'single' || analysisMode === 'before_after') && (
+      {/* 단건 결과 (일반 모드, 1장) */}
+      {!isBeforeAfter && imageCount === 1 && images[0].result && (
         <View style={styles.resultCard}>
-          <Text style={styles.foodName}>{result.menu_name}</Text>
+          <Text style={styles.foodName}>{images[0].result.menu_name}</Text>
           <Text style={styles.diffNote}>
             {photoDate ? `${photoDate} 기록 예정` : `${formatDate(new Date())} (오늘)`}
-            {analysisMode === 'before_after' ? '  |  실제 섭취량 기준' : ''}
           </Text>
           <View style={styles.nutrientGrid}>
-            <View style={styles.nutrientItem}><Text style={styles.nutrientVal}>{result.kcal}</Text><Text>kcal</Text></View>
-            <View style={styles.nutrientItem}><Text style={styles.nutrientVal}>{result.carbs_g}g</Text><Text>탄수화물</Text></View>
-            <View style={styles.nutrientItem}><Text style={styles.nutrientVal}>{result.protein_g}g</Text><Text>단백질</Text></View>
-            <View style={styles.nutrientItem}><Text style={styles.nutrientVal}>{result.fat_g}g</Text><Text>지방</Text></View>
+            <View style={styles.nutrientItem}><Text style={styles.nutrientVal}>{images[0].result.kcal}</Text><Text>kcal</Text></View>
+            <View style={styles.nutrientItem}><Text style={styles.nutrientVal}>{images[0].result.carbs_g}g</Text><Text>탄수화물</Text></View>
+            <View style={styles.nutrientItem}><Text style={styles.nutrientVal}>{images[0].result.protein_g}g</Text><Text>단백질</Text></View>
+            <View style={styles.nutrientItem}><Text style={styles.nutrientVal}>{images[0].result.fat_g}g</Text><Text>지방</Text></View>
           </View>
-          <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-            <Save size={20} color="#fff" />
-            <Text style={styles.saveBtnText}>식단 기록하기</Text>
-          </TouchableOpacity>
         </View>
       )}
 
-      {/* 멀티 일괄 저장 */}
-      {analysisMode === 'multi' && multiHasResults && (
-        <TouchableOpacity style={styles.saveBtn} onPress={handleSaveMulti}>
+      {/* 저장 버튼 */}
+      {hasResults && (
+        <TouchableOpacity style={styles.saveBtn} onPress={handleSaveAll}>
           <Save size={20} color="#fff" />
           <Text style={styles.saveBtnText}>
-            {multiImages.filter(i => i.result).length}개 식단 일괄 저장
+            {images.filter(i => i.result).length === 1 ? '식단 기록하기' : `${images.filter(i => i.result).length}개 식단 일괄 저장`}
           </Text>
         </TouchableOpacity>
       )}
 
       <View style={{ marginTop: 30, alignItems: 'center', opacity: 0.3 }}>
-        <Text style={{ fontSize: 10 }}>v1.5.0</Text>
+        <Text style={{ fontSize: 10 }}>v1.6.0</Text>
       </View>
     </ScrollView>
   );
@@ -488,18 +434,27 @@ const styles = StyleSheet.create({
   modeToggle: { flexDirection: 'row', backgroundColor: '#f0f0f0', borderRadius: 12, padding: 4, marginBottom: 20 },
   modeBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
   modeBtnActive: { backgroundColor: '#007bff' },
-  modeBtnText: { fontWeight: '600', color: '#666', fontSize: 13 },
+  modeBtnText: { fontWeight: '600', color: '#666', fontSize: 14 },
   modeBtnTextActive: { color: '#fff' },
 
-  // Single mode
-  image: { width: '100%', height: 280, borderRadius: 20, marginBottom: 15 },
+  // Placeholder
   placeholder: { width: '100%', height: 200, backgroundColor: '#f0f0f0', borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 15, borderStyle: 'dashed', borderWidth: 1, borderColor: '#ddd' },
-  placeholderText: { color: '#888', fontSize: 13 },
+  placeholderText: { color: '#888', fontSize: 13, textAlign: 'center', lineHeight: 20 },
+
+  // Single image
+  image: { width: '100%', height: 280, borderRadius: 20 },
+  singleOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.5)', borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+  singleResultOverlay: { position: 'absolute', bottom: 12, left: 12, right: 12, backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: 10, padding: 8, alignItems: 'center' },
+  singleResultName: { fontSize: 14, fontWeight: 'bold' },
+  singleResultKcal: { fontSize: 12, color: '#007bff' },
+  singleRemoveBtn: { position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 14, padding: 4 },
+
+  // Buttons
   buttonRow: { flexDirection: 'row', justifyContent: 'center', marginBottom: 15 },
   iconBtn: { backgroundColor: '#007bff', padding: 12, borderRadius: 12, flexDirection: 'row', alignItems: 'center', flex: 0.48, justifyContent: 'center', marginHorizontal: 4 },
   btnText: { color: '#fff', fontWeight: '600', marginLeft: 8 },
 
-  // Multi mode
+  // Multi grid
   multiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 15 },
   multiItem: { width: '31%', aspectRatio: 1, borderRadius: 12, overflow: 'hidden', position: 'relative' },
   multiImage: { width: '100%', height: '100%' },
@@ -509,12 +464,19 @@ const styles = StyleSheet.create({
   multiResultKcal: { fontSize: 9, color: '#007bff', textAlign: 'center' },
   multiRemoveBtn: { position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 10, padding: 2 },
 
-  // Before/After mode
-  beforeAfterRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
-  slot: { flex: 0.48 },
-  slotLabel: { fontSize: 14, fontWeight: 'bold', textAlign: 'center', marginBottom: 8, color: '#333' },
-  slotImage: { width: '100%', height: 160, borderRadius: 14, marginBottom: 8 },
-  slotPlaceholder: { width: '100%', height: 160, backgroundColor: '#f0f0f0', borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginBottom: 8, borderStyle: 'dashed', borderWidth: 1, borderColor: '#ddd' },
+  // Before/After
+  beforeAfterRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  slot: { flex: 0.48, position: 'relative' },
+  slotLabel: { fontSize: 13, fontWeight: 'bold', textAlign: 'center', marginBottom: 6, color: '#555' },
+  slotImage: { width: '100%', height: 150, borderRadius: 14 },
+  slotPlaceholder: { width: '100%', height: 150, backgroundColor: '#f0f0f0', borderRadius: 14, justifyContent: 'center', alignItems: 'center', borderStyle: 'dashed', borderWidth: 1, borderColor: '#ddd' },
+  slotOverlay: { position: 'absolute', top: 20, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center' },
+  pairLabel: { fontSize: 13, fontWeight: '600', color: '#007bff', marginBottom: 4 },
+  pairResult: { backgroundColor: '#f0f7ff', borderRadius: 10, padding: 10, marginTop: 6 },
+  pairResultName: { fontSize: 14, fontWeight: 'bold', textAlign: 'center' },
+  pairResultInfo: { fontSize: 12, color: '#666', textAlign: 'center', marginTop: 2 },
+  pairError: { fontSize: 11, color: '#d32f2f', textAlign: 'center', marginTop: 4 },
+  oddWarning: { fontSize: 12, color: '#e67e22', textAlign: 'center', marginBottom: 10 },
 
   // Analyze
   analyzeBtn: { backgroundColor: '#28a745', padding: 15, borderRadius: 12, alignItems: 'center', marginBottom: 15 },
@@ -528,7 +490,7 @@ const styles = StyleSheet.create({
   resultCard: { backgroundColor: '#fff', padding: 20, borderRadius: 20, marginTop: 10, borderWidth: 1, borderColor: '#eee' },
   foodName: { fontSize: 22, fontWeight: 'bold', marginBottom: 4 },
   diffNote: { fontSize: 12, color: '#28a745', marginBottom: 12 },
-  nutrientGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, marginTop: 12 },
+  nutrientGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10, marginTop: 12 },
   nutrientItem: { alignItems: 'center' },
   nutrientVal: { fontSize: 18, fontWeight: 'bold', color: '#007bff' },
   saveBtn: { backgroundColor: '#007bff', padding: 15, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 10 },
