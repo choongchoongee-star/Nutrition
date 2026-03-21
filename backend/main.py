@@ -3,7 +3,8 @@ import logging
 import sys
 import base64
 import requests
-from fastapi import FastAPI, UploadFile, File, Request
+import jwt as pyjwt
+from fastapi import FastAPI, UploadFile, File, Request, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
@@ -16,6 +17,20 @@ load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
+
+
+async def verify_token(request: Request):
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="인증이 필요합니다")
+    token = auth_header.split(" ")[1]
+    try:
+        pyjwt.decode(token, SUPABASE_JWT_SECRET, algorithms=["HS256"], audience="authenticated")
+    except pyjwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="토큰이 만료됐습니다")
+    except pyjwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다")
 
 app = FastAPI()
 
@@ -38,7 +53,7 @@ async def health():
     return json_res({"status": "ok", "version": "3.9 (POST goals)"})
 
 @app.get("/api/v1/meals")
-async def get_meals(date: str = None, page: int = 1, limit: int = 20):
+async def get_meals(date: str = None, page: int = 1, limit: int = 20, _=Depends(verify_token)):
     headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
     if date:
         url = f"{SUPABASE_URL}/rest/v1/meals?date=eq.{date}&select=*"
@@ -58,7 +73,7 @@ async def get_meals(date: str = None, page: int = 1, limit: int = 20):
         return json_res({"meals": resp.json(), "total": total, "page": page, "limit": limit})
 
 @app.post("/api/v1/meals")
-async def add_meal(request: Request):
+async def add_meal(request: Request, _=Depends(verify_token)):
     body = await request.json()
     url = f"{SUPABASE_URL}/rest/v1/meals"
     headers = {
@@ -75,7 +90,7 @@ async def add_meal(request: Request):
     return json_res(data[0] if data else body)
 
 @app.get("/api/v1/goals")
-async def get_goals():
+async def get_goals(_=Depends(verify_token)):
     default = {"target_kcal": 2000, "target_carbs": 250, "target_protein": 60, "target_fat": 50}
     try:
         url = f"{SUPABASE_URL}/rest/v1/goals?select=*&order=id.desc&limit=1"
@@ -92,7 +107,7 @@ async def get_goals():
         return json_res(default)
 
 @app.post("/api/v1/goals")
-async def update_goals(request: Request):
+async def update_goals(request: Request, _=Depends(verify_token)):
     body = await request.json()
     headers = {
         "apikey": SUPABASE_KEY,
@@ -110,7 +125,7 @@ async def update_goals(request: Request):
     return json_res(data[0] if data else payload)
 
 @app.delete("/api/v1/meals/{meal_id}")
-async def delete_meal(meal_id: int):
+async def delete_meal(meal_id: int, _=Depends(verify_token)):
     url = f"{SUPABASE_URL}/rest/v1/meals?id=eq.{meal_id}"
     headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
     resp = requests.delete(url, headers=headers)
@@ -120,7 +135,7 @@ async def delete_meal(meal_id: int):
     return json_res({"success": True})
 
 @app.post("/api/v1/analyze")
-async def analyze(image: UploadFile = File(...)):
+async def analyze(image: UploadFile = File(...), _=Depends(verify_token)):
     content = await image.read()
     base64_img = base64.b64encode(content).decode('utf-8')
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GOOGLE_API_KEY}"

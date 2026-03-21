@@ -10,3 +10,4 @@ python-multipart
 requests
 starlette
 supabase
+PyJWT

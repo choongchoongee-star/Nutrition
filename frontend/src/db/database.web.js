@@ -1,7 +1,14 @@
 import axios from 'axios';
+import { supabase } from '../lib/supabase';
 
 // 백엔드 API 주소 (Vercel)
 const API_BASE_URL = "https://nutrition-choongchoongee-7456s-projects.vercel.app/api/v1";
+
+const getAuthHeaders = async () => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) return {};
+  return { Authorization: `Bearer ${session.access_token}` };
+};
 
 export const initDatabase = async () => {
   console.log("Cloud Database (Supabase via Vercel) initialized");
@@ -9,7 +16,8 @@ export const initDatabase = async () => {
 
 export const getGoals = async () => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/goals`);
+    const headers = await getAuthHeaders();
+    const response = await axios.get(`${API_BASE_URL}/goals`, { headers });
     return response.data;
   } catch (e) {
     console.error("Failed to fetch goals:", e);
@@ -19,7 +27,8 @@ export const getGoals = async () => {
 
 export const updateGoals = async (goals) => {
   try {
-    await axios.post(`${API_BASE_URL}/goals`, goals);
+    const headers = await getAuthHeaders();
+    await axios.post(`${API_BASE_URL}/goals`, goals, { headers });
   } catch (e) {
     console.error("Failed to update goals:", e);
   }
@@ -27,8 +36,8 @@ export const updateGoals = async (goals) => {
 
 export const saveMeal = async (meal) => {
   try {
-    // 썸네일 처리 로직은 HomeScreen에서 수행되므로 여기선 전달만 함
-    const response = await axios.post(`${API_BASE_URL}/meals`, meal);
+    const headers = await getAuthHeaders();
+    const response = await axios.post(`${API_BASE_URL}/meals`, meal, { headers });
     return response.data.id;
   } catch (e) {
     console.error("Failed to save meal to cloud:", e);
@@ -38,7 +47,8 @@ export const saveMeal = async (meal) => {
 
 export const getMealsByDate = async (date) => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/meals?date=${date}`);
+    const headers = await getAuthHeaders();
+    const response = await axios.get(`${API_BASE_URL}/meals?date=${date}`, { headers });
     return response.data;
   } catch (e) {
     console.error("Failed to fetch meals:", e);
@@ -48,7 +58,8 @@ export const getMealsByDate = async (date) => {
 
 export const deleteMeal = async (id) => {
   try {
-    await axios.delete(`${API_BASE_URL}/meals/${id}`);
+    const headers = await getAuthHeaders();
+    await axios.delete(`${API_BASE_URL}/meals/${id}`, { headers });
   } catch (e) {
     console.error("Failed to delete meal:", e);
   }
@@ -56,7 +67,8 @@ export const deleteMeal = async (id) => {
 
 export const getAllMeals = async (page = 1, limit = 20) => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/meals?page=${page}&limit=${limit}`);
+    const headers = await getAuthHeaders();
+    const response = await axios.get(`${API_BASE_URL}/meals?page=${page}&limit=${limit}`, { headers });
     return response.data;
   } catch (e) {
     console.error("Failed to fetch all meals:", e);
