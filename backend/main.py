@@ -29,7 +29,8 @@ async def verify_token(request: Request):
         pyjwt.decode(token, SUPABASE_JWT_SECRET, algorithms=["HS256"], audience="authenticated")
     except pyjwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="토큰이 만료됐습니다")
-    except pyjwt.InvalidTokenError:
+    except pyjwt.InvalidTokenError as e:
+        logger.error(f"JWT verification failed: {type(e).__name__}: {e}")
         raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다")
 
 app = FastAPI()
