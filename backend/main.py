@@ -53,6 +53,19 @@ def json_res(data, status=200):
 async def health():
     return json_res({"status": "ok", "version": "3.9 (POST goals)"})
 
+@app.get("/api/v1/debug/token")
+async def debug_token(request: Request):
+    secret_set = bool(SUPABASE_JWT_SECRET)
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return json_res({"secret_set": secret_set, "token_present": False})
+    token = auth_header.split(" ")[1]
+    try:
+        pyjwt.decode(token, SUPABASE_JWT_SECRET, algorithms=["HS256"], audience="authenticated")
+        return json_res({"secret_set": secret_set, "token_present": True, "valid": True})
+    except Exception as e:
+        return json_res({"secret_set": secret_set, "token_present": True, "valid": False, "error": type(e).__name__, "msg": str(e)})
+
 @app.get("/api/v1/meals")
 async def get_meals(date: str = None, page: int = 1, limit: int = 20, _=Depends(verify_token)):
     headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
