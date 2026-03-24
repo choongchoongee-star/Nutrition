@@ -17,7 +17,20 @@ load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
+
+import json
+from jwt.algorithms import RSAAlgorithm
+
+def _load_supabase_public_key():
+    try:
+        resp = requests.get(f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json", timeout=5)
+        jwk = resp.json()["keys"][0]
+        return RSAAlgorithm.from_jwk(json.dumps(jwk))
+    except Exception as e:
+        logger.error(f"Failed to load Supabase public key: {e}")
+        return None
+
+SUPABASE_PUBLIC_KEY = _load_supabase_public_key()
 
 
 async def verify_token(request: Request):
@@ -26,7 +39,7 @@ async def verify_token(request: Request):
         raise HTTPException(status_code=401, detail="인증이 필요합니다")
     token = auth_header.split(" ")[1]
     try:
-        pyjwt.decode(token, SUPABASE_JWT_SECRET, algorithms=["HS256"], audience="authenticated")
+        pyjwt.decode(token, SUPABASE_PUBLIC_KEY, algorithms=["RS256"], audience="authenticated")
     except pyjwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="토큰이 만료됐습니다")
     except pyjwt.InvalidTokenError as e:
@@ -61,10 +74,10 @@ async def debug_token(request: Request):
         return json_res({"secret_set": secret_set, "token_present": False})
     token = auth_header.split(" ")[1]
     try:
-        pyjwt.decode(token, SUPABASE_JWT_SECRET, algorithms=["HS256"], audience="authenticated")
-        return json_res({"secret_set": secret_set, "token_present": True, "valid": True})
+        pyjwt.decode(token, SUPABASE_PUBLIC_KEY, algorithms=["RS256"], audience="authenticated")
+        return json_res({"key_loaded": bool(SUPABASE_PUBLIC_KEY), "token_present": True, "valid": True})
     except Exception as e:
-        return json_res({"secret_set": secret_set, "token_present": True, "valid": False, "error": type(e).__name__, "msg": str(e)})
+        return json_res({"key_loaded": bool(SUPABASE_PUBLIC_KEY), "token_present": True, "valid": False, "error": type(e).__name__, "msg": str(e)})
 
 @app.get("/api/v1/meals")
 async def get_meals(date: str = None, page: int = 1, limit: int = 20, _=Depends(verify_token)):
