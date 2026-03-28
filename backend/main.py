@@ -1,4 +1,5 @@
 import os
+import re
 import logging
 import sys
 import base64
@@ -72,20 +73,10 @@ def json_res(data, status=200):
 async def health():
     return json_res({"status": "ok", "version": "3.9 (POST goals)"})
 
-@app.get("/api/v1/debug/token")
-async def debug_token(request: Request):
-    auth_header = request.headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer "):
-        return json_res({"key_loaded": bool(SUPABASE_PUBLIC_KEY), "token_present": False})
-    token = auth_header.split(" ")[1]
-    try:
-        pyjwt.decode(token, SUPABASE_PUBLIC_KEY, algorithms=["RS256"], audience="authenticated")
-        return json_res({"key_loaded": bool(SUPABASE_PUBLIC_KEY), "token_present": True, "valid": True})
-    except Exception as e:
-        return json_res({"key_loaded": bool(SUPABASE_PUBLIC_KEY), "token_present": True, "valid": False, "error": type(e).__name__, "msg": str(e)})
-
 @app.get("/api/v1/meals")
 async def get_meals(date: str = None, page: int = 1, limit: int = 20, _=Depends(verify_token)):
+    if date and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date):
+        return json_res({"error": "날짜 형식이 올바르지 않습니다 (YYYY-MM-DD)"}, 400)
     headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
     if date:
         url = f"{SUPABASE_URL}/rest/v1/meals?date=eq.{date}&select=*"
