@@ -9,6 +9,10 @@ from fastapi import FastAPI, UploadFile, File, Request, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 logger = logging.getLogger(__name__)
@@ -48,7 +52,15 @@ async def verify_token(request: Request):
         logger.error(f"JWT verification failed: {type(e).__name__}: {e}")
         raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다")
 
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI()
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, lambda req, exc: JSONResponse(
+    status_code=429,
+    content={"error": "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요."}
+))
+app.add_middleware(SlowAPIMiddleware)
 
 ALLOWED_ORIGINS = [
     "https://choongchoongee-star.github.io",
@@ -158,7 +170,8 @@ async def delete_meal(meal_id: int, _=Depends(verify_token)):
     return json_res({"success": True})
 
 @app.post("/api/v1/analyze")
-async def analyze(image: UploadFile = File(...), _=Depends(verify_token)):
+@limiter.limit("20/minute")
+async def analyze(request: Request, image: UploadFile = File(...), _=Depends(verify_token)):
     content = await image.read()
     base64_img = base64.b64encode(content).decode('utf-8')
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GOOGLE_API_KEY}"

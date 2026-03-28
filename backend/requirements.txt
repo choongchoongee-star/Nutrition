@@ -11,3 +11,4 @@ requests
 starlette
 supabase
 PyJWT[crypto]
+slowapi
