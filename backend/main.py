@@ -21,6 +21,7 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 import json
 from jwt.algorithms import RSAAlgorithm
 
+
 def _load_supabase_public_key():
     try:
         resp = requests.get(f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json", timeout=5)
@@ -48,9 +49,14 @@ async def verify_token(request: Request):
 
 app = FastAPI()
 
+ALLOWED_ORIGINS = [
+    "https://choongchoongee-star.github.io",
+    "https://nutrition-choongchoongee-7456s-projects.vercel.app",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -58,7 +64,7 @@ app.add_middleware(
 )
 
 def json_res(data, status=200):
-    return JSONResponse(content=data, status_code=status, headers={"Access-Control-Allow-Origin": "*"})
+    return JSONResponse(content=data, status_code=status)
 
 # --- 핵심 API ---
 
@@ -68,10 +74,9 @@ async def health():
 
 @app.get("/api/v1/debug/token")
 async def debug_token(request: Request):
-    secret_set = bool(SUPABASE_JWT_SECRET)
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
-        return json_res({"secret_set": secret_set, "token_present": False})
+        return json_res({"key_loaded": bool(SUPABASE_PUBLIC_KEY), "token_present": False})
     token = auth_header.split(" ")[1]
     try:
         pyjwt.decode(token, SUPABASE_PUBLIC_KEY, algorithms=["RS256"], audience="authenticated")
@@ -169,7 +174,10 @@ async def analyze(image: UploadFile = File(...), _=Depends(verify_token)):
     prompt = "이 음식 사진을 분석하고 JSON만 반환하세요. menu_name은 반드시 한국어로: {'menu_name':str, 'weight_g':float, 'kcal':float, 'carbs_g':float, 'protein_g':float, 'fat_g':float}"
     payload = {"contents": [{"parts": [{"text": prompt}, {"inline_data": {"mime_type": "image/jpeg", "data": base64_img}}]}], "generationConfig": {"temperature": 0.1}}
     resp = requests.post(url, json=payload)
-    res_json = resp.json()
-    txt = res_json['candidates'][0]['content']['parts'][0]['text'].strip()
-    import json
-    return json_res(json.loads(txt[txt.find('{'):txt.rfind('}')+1]))
+    try:
+        res_json = resp.json()
+        txt = res_json['candidates'][0]['content']['parts'][0]['text'].strip()
+        return json_res(json.loads(txt[txt.find('{'):txt.rfind('}')+1]))
+    except (KeyError, IndexError, json.JSONDecodeError) as e:
+        logger.error(f"Gemini 응답 파싱 실패: {e} | status={resp.status_code} | body={resp.text[:200]}")
+        return json_res({"error": "음식 분석에 실패했습니다. 다시 시도해 주세요."}, 400)

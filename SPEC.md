@@ -1,7 +1,7 @@
 # Nutrition (AI 식단 일기) — 기획서
 
-> 마지막 업데이트: 2026-03-21
-> 현재 Phase: Phase 1 완료 / Phase 2 예정
+> 마지막 업데이트: 2026-03-29
+> 현재 Phase: Phase 1 완료 / Phase 2 완료
 
 ---
 
@@ -104,9 +104,10 @@ Nutrition/
 - 일일 목표 입력 (kcal, 탄단지 수치)
 - **구현 상태:** ✅ 완료
 
-### 4.5 사용자 인증 및 클라우드 동기화
-- Firebase 인증 + 다기기 동기화
-- **구현 상태:** 📋 예정
+### 4.5 사용자 인증
+- Supabase Auth (Google OAuth) 로그인
+- 백엔드 JWT 검증 (RS256, Supabase JWKS 기반) — 모든 API 엔드포인트에 적용
+- **구현 상태:** ✅ 완료
 
 ---
 
@@ -141,9 +142,9 @@ Nutrition/
 - [x] 전체 UI 한국어 현지화
 - [x] 422 오류 수정 (Pydantic 타입 정렬)
 
-### 🚧 Phase 2 — 인증 (진행중)
-- [ ] Google 로그인 (Supabase Auth)
-- [ ] 미인증 요청 차단 (백엔드 JWT 검증)
+### ✅ Phase 2 — 인증 (완료)
+- [x] Google 로그인 (Supabase Auth)
+- [x] 미인증 요청 차단 (백엔드 JWT 검증, RS256)
 
 ---
 
@@ -159,5 +160,4 @@ Nutrition/
 
 ## 8. 미완료 / 알려진 이슈
 
-- [ ] Render.com 백엔드 안정성 모니터링 필요 (cold start 지연)
-- [ ] 인증 미구현 — 현재 단일 사용자 데이터 혼용 가능성 있음 (2026-03-21 기준, Phase 2에서 해결 예정)
+- [ ] Vercel 백엔드 cold start 지연 모니터링 필요
