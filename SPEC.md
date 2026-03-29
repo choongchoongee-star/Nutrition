@@ -44,7 +44,7 @@ Nutrition/
 ```
 
 ### 외부 의존성
-- Google Gemini 1.5 Flash API (`.env` — `GEMINI_API_KEY`)
+- Google Gemini 2.5 Flash API (`.env` — `GOOGLE_API_KEY` 또는 `GEMINI_API_KEY`)
 - Supabase (PostgreSQL REST API)
 - Render 또는 Railway (FastAPI 호스팅)
 - GitHub Actions (GitHub Pages 프론트엔드 자동 배포)
@@ -113,19 +113,25 @@ Nutrition/
 
 ## 5. API 명세
 
+모든 엔드포인트는 `Authorization: Bearer <jwt>` 헤더 필수 (`/health` 제외).
+Rate limit: `/api/v1/analyze` — IP당 20req/min.
+
 | Method | Endpoint | 설명 | Request | Response |
 |--------|----------|------|---------|----------|
-| POST | `/api/v1/analyze` | 음식 사진 AI 분석 | multipart image | `{ menu_name, weight_g, kcal, carbs_g, protein_g, fat_g }` |
-| GET | `/health` | 서버 헬스체크 | — | `{ status: "ok" }` |
-
-### Gemini 프롬프트
-> "당신은 전문 영양사 AI입니다. 업로드된 사진 속 음식을 인식하고, 일반적인 1인분 크기를 기준으로 무게(g)를 추정한 뒤 칼로리, 탄수화물, 단백질, 지방 함량을 계산하세요. 결과는 반드시 한국어 메뉴명과 함께 순수 JSON 형식으로만 응답하세요."
+| GET | `/api/v1/health` | 헬스체크 | — | `{ status: "ok" }` |
+| GET | `/api/v1/meals` | 식사 기록 조회 | `?date=YYYY-MM-DD` 또는 `?page=&limit=` | meals 배열 또는 페이지네이션 객체 |
+| POST | `/api/v1/meals` | 식사 기록 저장 | `{ date, meal_type, menu_name, kcal, carbs_g, protein_g, fat_g }` | 저장된 레코드 |
+| DELETE | `/api/v1/meals/{id}` | 식사 기록 삭제 | — | `{ success: true }` |
+| GET | `/api/v1/goals` | 목표 조회 | — | `{ target_kcal, target_carbs, target_protein, target_fat }` |
+| POST | `/api/v1/goals` | 목표 저장 | `{ target_kcal, target_carbs, target_protein, target_fat }` | 저장된 레코드 |
+| POST | `/api/v1/analyze` | 음식 사진 AI 분석 | multipart image (jpeg/png/webp/heic, 최대 10MB) | `{ menu_name, weight_g, kcal, carbs_g, protein_g, fat_g }` |
 
 ### 백엔드 의존성
-- `fastapi`, `uvicorn`
-- `google-generativeai`
-- `pydantic`
-- `python-dotenv`
+- `fastapi`, `uvicorn`, `gunicorn`
+- `requests`, `pydantic`, `python-dotenv`
+- `slowapi` (rate limiting)
+- `PyJWT[crypto]` (RS256 JWT 검증)
+- `python-multipart` (파일 업로드)
 
 ---
 
