@@ -167,3 +167,4 @@ Rate limit: `/api/v1/analyze` — IP당 20req/min.
 ## 8. 미완료 / 알려진 이슈
 
 - [ ] Vercel 백엔드 cold start 지연 모니터링 필요
+- [x] Supabase RLS 활성화 완료 (meals, goals — authenticated role 전체 접근, anon key 차단)
